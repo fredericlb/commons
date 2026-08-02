@@ -7,8 +7,8 @@
     "dev/*"
   ],
   "scripts": {
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
+    "lint": "biome check packages dev scripts .storybook --config-path=.biome",
+    "lint:fix": "biome check --write packages dev scripts .storybook --config-path=.biome",
     "test": "turbo run test",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
