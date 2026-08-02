@@ -1,0 +1,64 @@
+version: 47
+jobs:
+- name: lint and test
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+    optional: false
+  - type: CommandStep
+    name: lint and test
+    runInContainer: true
+    image: node:22-alpine
+    interpreter:
+      type: DefaultInterpreter
+      commands: |
+        npm ci
+        npm run lint
+        npx turbo run test
+    runAs: 1000:1000
+    useTTY: true
+    condition: SUCCESSFUL
+    optional: false
+  triggers:
+  - type: BranchUpdateTrigger
+    branches: master
+    userMatch: anyone
+  retryCondition: never
+  maxRetries: 3
+  retryDelay: 30
+  timeout: 3600
+- name: build and publish base image
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+    optional: false
+  - type: BuildImageStep
+    name: build and push base
+    buildPath: .
+    dockerfile: dev/docker-runtime/Dockerfile
+    output:
+      type: RegistryOutput
+      tags: dev.frediver.se/frediverse/base:latest dev.frediver.se/frediverse/base:@build_number@
+    condition: SUCCESSFUL
+    optional: false
+  triggers:
+  - type: BranchUpdateTrigger
+    branches: master
+    userMatch: anyone
+  jobDependencies:
+  - jobName: lint and test
+    requireSuccessful: true
+  retryCondition: never
+  maxRetries: 3
+  retryDelay: 30
+  timeout: 3600

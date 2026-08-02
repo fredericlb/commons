@@ -1,0 +1,89 @@
+/* Shared design tokens for @frediverse/ui — the single source of truth for the
+   palette and radii every consuming app inherits. Apps import this once
+   (`@import "@frediverse/ui/theme.css";`) after `@import "tailwindcss";`.
+
+   The shadcn-style tokens use their own --sh-* names so they don't collide
+   with any legacy --accent / --muted / --border an app may already define.
+   The theme is dark-only, so the tokens live straight on :root. */
+
+:root {
+  --sh-background: #101114;
+  --sh-foreground: #e9e9ee;
+  --sh-card: #1b1c22;
+  --sh-card-foreground: #e9e9ee;
+  --sh-popover: #1b1c22;
+  --sh-popover-foreground: #e9e9ee;
+  --sh-primary: #8b5cf6;
+  --sh-primary-hover: #7c3aed;
+  --sh-primary-foreground: #ffffff;
+  --sh-secondary: #24252c;
+  --sh-secondary-hover: #2c2d36;
+  --sh-secondary-foreground: #e9e9ee;
+  --sh-muted: #24252c;
+  --sh-muted-foreground: #92929e;
+  --sh-accent: #24252c;
+  --sh-accent-foreground: #e9e9ee;
+  --sh-destructive: #f16469;
+  --sh-border: #2f303a;
+  --sh-input: #2f303a;
+  --sh-ring: #8b5cf6;
+  --sh-amber: #f0a94e;
+  --sh-green: #34d399;
+  /* rounded-md resolves to 8px — the legacy control radius. */
+  --sh-radius: 10px;
+}
+
+/* Frediverse type. Faster One is the app-title face (display only, 400 weight —
+   never use it below ~24px or for body copy); Palanquin is the body face. Both
+   come from Google Fonts and must be linked in the consuming app's index.html.
+   An app with its own identity (acu's Noto/CJK, obscura's Press Start 2P)
+   overrides these in its own stylesheet. */
+/* `static` so both vars are always emitted: Tailwind tree-shakes unused theme
+   vars, and --font-display has no utility usage yet in most apps — but legacy
+   stylesheets reference it as plain `var(--font-display)`, which the shaker
+   can't see. */
+@theme static {
+  --font-sans: "Palanquin", system-ui, sans-serif;
+  --font-display: "Faster One", "Palanquin", system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--sh-background);
+  --color-foreground: var(--sh-foreground);
+  --color-card: var(--sh-card);
+  --color-card-foreground: var(--sh-card-foreground);
+  --color-popover: var(--sh-popover);
+  --color-popover-foreground: var(--sh-popover-foreground);
+  --color-primary: var(--sh-primary);
+  --color-primary-hover: var(--sh-primary-hover);
+  --color-primary-foreground: var(--sh-primary-foreground);
+  --color-secondary: var(--sh-secondary);
+  --color-secondary-hover: var(--sh-secondary-hover);
+  --color-secondary-foreground: var(--sh-secondary-foreground);
+  --color-muted: var(--sh-muted);
+  --color-muted-foreground: var(--sh-muted-foreground);
+  --color-accent: var(--sh-accent);
+  --color-accent-foreground: var(--sh-accent-foreground);
+  --color-destructive: var(--sh-destructive);
+  --color-border: var(--sh-border);
+  --color-input: var(--sh-input);
+  --color-ring: var(--sh-ring);
+  --color-amber: var(--sh-amber);
+  --color-green: var(--sh-green);
+  --radius-sm: calc(var(--sh-radius) - 4px);
+  --radius-md: calc(var(--sh-radius) - 2px);
+  --radius-lg: var(--sh-radius);
+  --radius-xl: calc(var(--sh-radius) + 2px);
+}
+
+/* Vertical (portrait) tablets: collapse header navigation to icons only. Nav
+   items keep their `.nav-icon` and drop the text `.nav-label`, so the header
+   stays compact without a hamburger. Shared by every app that imports this
+   stylesheet (radiok7, routine, …) — a header opts in simply by wrapping its
+   text in `.nav-label`. Bounds: min 600px excludes portrait phones (which have
+   their own icons-only rules); max 1024px covers up to a 12.9" iPad portrait. */
+@media (min-width: 600px) and (max-width: 1024px) and (orientation: portrait) {
+  .nav-label {
+    display: none !important;
+  }
+}
