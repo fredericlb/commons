@@ -11,11 +11,20 @@ component, so the two behave identically instead of drifting.
   under the same `reveal`, the user's own toggles survive. Lanes wants the
   first behaviour on a project switch and the second on every 2 s poll — one
   prop covers both, and getting it wrong is how a sidebar "randomly" collapses.
+
+  A caller that wraps its nodes in a **synthetic root row** — one whose `path`
+  is `""`, which is the only way to get a visible top level, since `rootLabel`
+  only names the background menu's target — is covered too. Prefix-building
+  cannot produce `""`, so seeding from the ancestors alone re-seeded that row
+  CLOSED and revealed nothing at all; the empty path is now treated as the
+  ancestor of everything. A tree with no such row is unaffected: nothing reads
+  the extra key.
 - **The right-click menu**, including the inline prompt some entries need
   (rename, new file). A menu with nothing to offer does not open at all: an
   empty grey box you have to dismiss is worse than the browser's own menu.
 - **Drag and drop**, of two kinds that land on the same folder rows:
-  - an **OS file drag** → `onDropFiles(dir, files)`;
+  - an **OS file drag** → `onDropFiles(dir, files)`, or `onDropTree(dir, files)`
+    when the app can take folders (see below);
   - an **internal row drag** → `onMove(from, toDir)`, carried under
     `TREE_DRAG_MIME` so the two can never be confused. A folder dropped into
     its own subtree is refused before `dragover` calls `preventDefault`, so the
@@ -23,6 +32,27 @@ component, so the two behave identically instead of drifting.
 
   Each is opt-in: omit the handler and that drag is refused. Rows are only
   `draggable` when `onMove` is given.
+
+## Dropping a FOLDER
+
+`dataTransfer.files` is a flat `FileList` and **cannot carry a directory** — a
+dropped folder arrives in it as an entry that will not read, or not at all. So
+an app whose content is folder-shaped (studio's modules are three files in a
+folder) got nothing from a folder drop, with no error to explain it.
+
+`onDropTree(dir, files)` is the same gesture read properly: each file paired
+with the path it sat at inside what was dropped, so `audio/reverb/` arrives as
+`audio/reverb/module.yaml` and its siblings. It wins over `onDropFiles` when
+both are given, and falls back to the flat list on a browser with no entry API.
+
+Two traps live in `lib/droppedEntries.ts`, both of which fail *silently*:
+
+- `dataTransfer.items` is emptied the instant the drop handler yields, so the
+  entries must be claimed **before** anything is awaited. A walk that starts
+  after an `await` finds an empty list.
+- `readEntries()` answers a **batch** (100 in Chrome), not the whole directory.
+  It has to be called until it answers an empty one, or a big folder arrives
+  quietly truncated.
 
 ## What it does not own
 

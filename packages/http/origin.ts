@@ -32,12 +32,18 @@ export function publicOrigin(req: Request): string {
 }
 
 // The OIDC redirect_uri must be ABSOLUTE, so it's derived per request rather
-// than configured. /auth/* reaches the backend with its prefix intact (only
-// /api is stripped by the proxy), so the callback is <origin>/auth/callback.
+// than configured: <origin><prefix>/auth/callback.
 //
-// login and callback must present an IDENTICAL redirect_uri or the token
-// exchange is rejected; both are top-level navigations to the same public
-// origin, so they agree.
+// The prefix is X-Forwarded-Prefix, set by the edge when a service is mounted
+// under a path rather than a host of its own. Without it the callback would name
+// the origin ROOT, which on a shared origin belongs to whichever service owns the
+// common login — so a service running its own flow would send the browser back to
+// a different backend, and the token exchange would fail with no clue why.
+// Absent, the behaviour is what it always was.
+//
+// login and callback must present an IDENTICAL redirect_uri or the exchange is
+// rejected; both are top-level navigations through the same edge, so they agree.
 export function redirectUriFor(req: Request): string {
-  return `${publicOrigin(req)}/auth/callback`;
+  const prefix = (req.get("x-forwarded-prefix") ?? "").replace(/\/+$/, "");
+  return `${publicOrigin(req)}${prefix}/auth/callback`;
 }

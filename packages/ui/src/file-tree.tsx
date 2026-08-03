@@ -11,7 +11,14 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type DroppedFile,
+  dropEntries,
+  readDroppedFiles,
+} from "./lib/droppedEntries";
 import { cn } from "./lib/utils";
+
+export type { DroppedFile };
 
 /** The minimum a node must carry. Apps extend it and keep their own fields. */
 export interface TreeNode {
@@ -61,6 +68,10 @@ export const TREE_DRAG_MIME = "application/x-frediverse-tree-path";
 function ancestorsOf(path: string | null | undefined): Set<string> {
   const out = new Set<string>();
   if (!path || path === ".") return out;
+  // The empty path — a synthetic ROOT row, which some callers wrap their nodes in to get a
+  // visible top level. Every path sits under it, but prefix-building can never produce it, so
+  // seeding expansion from this set alone re-seeded that row CLOSED and revealed nothing.
+  out.add("");
   const parts = path.split("/");
   for (let i = 1; i <= parts.length; i++) out.add(parts.slice(0, i).join("/"));
   return out;
@@ -73,6 +84,34 @@ const defaultAcceptsFiles = (e: React.DragEvent): boolean => {
   if (Array.from(dt.types ?? []).includes("Files")) return true;
   return Array.from(dt.items ?? []).some((i) => i.kind === "file");
 };
+
+/**
+ * Hand a drop to whichever handler the host gave, folders included.
+ *
+ * The entries are claimed SYNCHRONOUSLY (dropEntries) before anything is awaited: the
+ * DataTransfer is emptied the instant this handler yields, and a walk that starts after an
+ * `await` finds nothing. That is the bug this whole path exists to avoid.
+ */
+function dropInto(
+  dir: string,
+  e: React.DragEvent,
+  onDropTree?: (dir: string, files: DroppedFile[]) => void,
+  onDropFiles?: (dir: string, files: File[]) => void,
+): void {
+  if (onDropTree) {
+    const entries = dropEntries(e.dataTransfer);
+    const flat = Array.from(e.dataTransfer.files); // the fallback, also read before yielding
+    void readDroppedFiles(entries).then((files) => {
+      if (files.length) onDropTree(dir, files);
+      // A browser with no entry API at all still drops plain files, which have no folders in them.
+      else if (flat.length)
+        onDropTree(dir, flat.map((file) => ({ path: file.name, file })));
+    });
+    return;
+  }
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length) onDropFiles?.(dir, files);
+}
 
 // A row drag carries the source path under our own MIME, so a move never looks like an upload.
 const draggedPath = (e: React.DragEvent): string | null =>
@@ -97,6 +136,7 @@ interface RowProps<N extends TreeNode> {
   onOpen?: (node: N) => void;
   onDropTarget: (path: string | null) => void;
   onDropFiles?: (dir: string, files: File[]) => void;
+  onDropTree?: (dir: string, files: DroppedFile[]) => void;
   onMove?: (from: string, toDir: string) => void;
   onContext: (node: N, e: React.MouseEvent) => void;
   acceptsFiles: (e: React.DragEvent) => boolean;
@@ -117,6 +157,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     onOpen,
     onDropTarget,
     onDropFiles,
+    onDropTree,
     onMove,
     onContext,
     acceptsFiles,
@@ -138,7 +179,8 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     onDragOver: (e: React.DragEvent) => {
       const moving = draggedPath(e);
       if (moving !== null && (!onMove || isInside(moving, dir))) return;
-      if (moving === null && !(acceptsFiles(e) && onDropFiles)) return;
+      if (moving === null && !(acceptsFiles(e) && (onDropTree ?? onDropFiles)))
+        return;
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = moving === null ? "copy" : "move";
@@ -154,12 +196,11 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
         onMove(moving, dir);
         return;
       }
-      if (!acceptsFiles(e) || !onDropFiles) return;
+      if (!acceptsFiles(e) || !(onDropTree ?? onDropFiles)) return;
       e.preventDefault();
       e.stopPropagation();
       onDropTarget(null);
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length) onDropFiles(dir, files);
+      dropInto(dir, e, onDropTree, onDropFiles);
     },
   });
 
@@ -287,8 +328,12 @@ export interface FileTreeProps<N extends TreeNode> {
   rootLabel?: string;
   actions?: TreeAction<N>[];
   onOpen?: (node: N) => void;
-  /** Drop OS files into a folder. Omit and file drags are refused. */
+  /** Drop OS files into a folder. Omit and file drags are refused. FLAT: a dropped folder
+   *  never reaches this, because `dataTransfer.files` cannot carry one. */
   onDropFiles?: (dir: string, files: File[]) => void;
+  /** The same drop, with the FOLDERS kept — each file paired with its path inside what was
+   *  dropped. Wins over `onDropFiles` when both are given; see lib/droppedEntries.ts. */
+  onDropTree?: (dir: string, files: DroppedFile[]) => void;
   /** Move a row into a folder. Omit and rows aren't draggable. */
   onMove?: (from: string, toDir: string) => void;
   /** Trailing widget on a row (lanes's "open project", calepin's badges). */
@@ -314,6 +359,7 @@ export function FileTree<N extends TreeNode>({
   actions = [],
   onOpen,
   onDropFiles,
+  onDropTree,
   onMove,
   rowEnd,
   icon,
@@ -456,7 +502,8 @@ export function FileTree<N extends TreeNode>({
       onDragOver={(e) => {
         const moving = draggedPath(e);
         if (moving !== null && !onMove) return;
-        if (moving === null && !(acceptsFiles(e) && onDropFiles)) return;
+        if (moving === null && !(acceptsFiles(e) && (onDropTree ?? onDropFiles)))
+          return;
         e.preventDefault();
         e.dataTransfer.dropEffect = moving === null ? "copy" : "move";
         setDropTarget(rootPath);
@@ -477,11 +524,10 @@ export function FileTree<N extends TreeNode>({
           onMove(moving, rootPath);
           return;
         }
-        if (!acceptsFiles(e) || !onDropFiles) return;
+        if (!acceptsFiles(e) || !(onDropTree ?? onDropFiles)) return;
         e.preventDefault();
         setDropTarget(null);
-        const files = Array.from(e.dataTransfer.files);
-        if (files.length) onDropFiles(rootPath, files);
+        dropInto(rootPath, e, onDropTree, onDropFiles);
       }}
     >
       {header}
@@ -499,6 +545,7 @@ export function FileTree<N extends TreeNode>({
           onOpen={onOpen}
           onDropTarget={setDropTarget}
           onDropFiles={onDropFiles}
+          onDropTree={onDropTree}
           onMove={onMove}
           onContext={onContext}
           acceptsFiles={acceptsFiles}
