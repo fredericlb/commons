@@ -16,6 +16,12 @@ const repoRoot = process.cwd();
 const ADMIN = "http://127.0.0.1:2019/config/";
 const LOG = join(tmpdir(), "frediverse-caddy.log");
 const MERGED = join(tmpdir(), "frediverse-Caddyfile");
+// `--adapter` is NOT optional. Caddy infers the Caddyfile adapter from the file
+// NAME — basename exactly `Caddyfile`, or a `.caddyfile` extension — and this
+// merged file is neither, so without it Caddy parses the config as JSON and dies
+// on the first `#` comment. Naming the temp file `Caddyfile` would work too, but
+// only until someone moves it; saying which adapter we mean cannot rot.
+const CONFIG = ["--adapter", "caddyfile", "--config", MERGED];
 const isWindows = process.platform === "win32";
 
 // Explicit rather than "scan every sibling directory": these repos sit directly
@@ -68,7 +74,7 @@ for (const f of files) console.log(`  sites: ${f}`);
 // up: the running instance may have been started from the sibling repo and know
 // nothing about our sites, so we always push the merged config.
 if (await isRunning()) {
-  const reload = spawnSync("caddy", ["reload", "--config", MERGED], {
+  const reload = spawnSync("caddy", ["reload", ...CONFIG], {
     cwd: commonsRoot,
     stdio: "inherit",
   });
@@ -90,8 +96,8 @@ if (!isWindows) {
 
 const out = openSync(LOG, "a");
 const [cmd, args] = isWindows
-  ? ["caddy", ["run", "--config", MERGED]]
-  : ["sudo", ["-n", "caddy", "run", "--config", MERGED]];
+  ? ["caddy", ["run", ...CONFIG]]
+  : ["sudo", ["-n", "caddy", "run", ...CONFIG]];
 
 const child = spawn(cmd, args, {
   cwd: commonsRoot,
