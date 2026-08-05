@@ -8,8 +8,8 @@
 #
 # If either process dies, tear both down so the container exits and the
 # orchestrator recycles it, instead of limping along with half the stack up.
-# (obscura deliberately supervises/restarts its backend instead and ships its
-# own entrypoint — see apps/obscura/docker/entrypoint.sh.)
+# (studio's z0 deliberately supervises/restarts its backend instead and ships
+# its own entrypoint — see that repo's apps/z0/docker/entrypoint.sh.)
 set -e
 
 if [ "$#" -eq 0 ]; then

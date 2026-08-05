@@ -60,7 +60,7 @@ RUN chmod +x /entrypoint.sh
 WORKDIR /app
 
 # nginx fronts every app on :80. Apps that also expose their backend directly
-# (e.g. obscura's 8080) add their own EXPOSE.
+# (e.g. z0's 8080) add their own EXPOSE.
 EXPOSE 80
 
 # The backend command comes from each app's CMD; see dev/docker-runtime/entrypoint.sh.

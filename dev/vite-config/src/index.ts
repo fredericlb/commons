@@ -39,10 +39,10 @@ export interface AppConfigOptions {
   host?: string;
   /**
    * Strip the `/api` prefix before forwarding to the backend, for a backend
-   * that serves BARE paths (`/songs`, not `/api/songs`). obscura's does —
+   * that serves BARE paths (`/songs`, not `/api/songs`). z0's does —
    * its Caddy block runs `uri strip_prefix /api` — so the dev proxy has to
    * match the edge. Most backends mount their routes under /api natively, so
-   * this stays off by default and only obscura opts in.
+   * this stays off by default and only z0 opts in.
    */
   stripApiPrefix?: boolean;
   /** Poll for changes — needed under WSL against /mnt/c, where inotify is mute. */

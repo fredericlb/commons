@@ -50,9 +50,9 @@ location /api/ {
 ## Overriding the entrypoint
 
 An app that needs different supervision copies its own over `/entrypoint.sh`
-(the base's `ENTRYPOINT` already points there). `obscura` does this: it
+(the base's `ENTRYPOINT` already points there). `z0` does this: it
 deliberately restarts its backend on crash instead of taking the container down
-— see `apps/obscura/docker/entrypoint.sh`.
+— see `apps/z0/docker/entrypoint.sh`.
 
 Keep genuinely app-specific nginx behaviour in the app's own `nginx.conf`: SSE
 (`proxy_buffering off`) and websocket (`Upgrade`/`Connection`) locations need

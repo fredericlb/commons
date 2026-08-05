@@ -105,7 +105,10 @@ function dropInto(
       if (files.length) onDropTree(dir, files);
       // A browser with no entry API at all still drops plain files, which have no folders in them.
       else if (flat.length)
-        onDropTree(dir, flat.map((file) => ({ path: file.name, file })));
+        onDropTree(
+          dir,
+          flat.map((file) => ({ path: file.name, file })),
+        );
     });
     return;
   }
@@ -134,6 +137,7 @@ interface RowProps<N extends TreeNode> {
   dropTarget: string | null;
   onToggle: (path: string) => void;
   onOpen?: (node: N) => void;
+  opensOnName?: (node: N) => boolean;
   onDropTarget: (path: string | null) => void;
   onDropFiles?: (dir: string, files: File[]) => void;
   onDropTree?: (dir: string, files: DroppedFile[]) => void;
@@ -155,6 +159,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     dropTarget,
     onToggle,
     onOpen,
+    opensOnName,
     onDropTarget,
     onDropFiles,
     onDropTree,
@@ -217,12 +222,19 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
 
   if (node.dir) {
     const isOpen = !!open[node.path];
+    // A folder that is ALSO a thing you open — the médiathèque's modules, which hold their assets
+    // and are edited as one row. Then the chevron folds and the NAME opens, which is two targets
+    // rather than one; everywhere else the whole row folds, exactly as before.
+    const opens = !!onOpen && !!opensOnName?.(node);
     // The whole subtree is this folder's drop zone: a nested file bubbles up, a nested folder claims itself.
     return (
       <div {...dropHandlers(node.path)}>
         <div
           className={cn(
             "flex items-center pr-1",
+            // An openable folder is a row you select, so it highlights like a leaf does — on the
+            // wrapper, for the same reason: a trailing badge would else cut the highlight short.
+            opens && activePath === node.path && "bg-secondary",
             dropTarget === node.path &&
               "rounded bg-primary/20 ring-1 ring-inset ring-primary/60",
           )}
@@ -234,9 +246,17 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
         >
           <button
             type="button"
-            {...dragProps}
+            {...(opens ? {} : dragProps)}
             onClick={() => onToggle(node.path)}
-            className="flex min-w-0 flex-1 items-center gap-1 py-0.5 text-left text-sm text-muted-foreground hover:text-foreground"
+            aria-label={
+              opens
+                ? `${isOpen ? "Collapse" : "Expand"} ${node.name}`
+                : undefined
+            }
+            className={cn(
+              "flex min-w-0 items-center gap-1 py-0.5 text-left text-sm text-muted-foreground hover:text-foreground",
+              opens ? "shrink-0" : "flex-1",
+            )}
           >
             <ChevronRight
               className={cn(
@@ -244,14 +264,26 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
                 isOpen && "rotate-90",
               )}
             />
-            {icon?.(node, isOpen) ??
-              (isOpen ? (
-                <FolderOpen className="h-4 w-4 shrink-0" />
-              ) : (
-                <Folder className="h-4 w-4 shrink-0" />
-              ))}
-            <span className="truncate">{node.name}</span>
+            {!opens &&
+              (icon?.(node, isOpen) ??
+                (isOpen ? (
+                  <FolderOpen className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Folder className="h-4 w-4 shrink-0" />
+                )))}
+            {!opens && <span className="truncate">{node.name}</span>}
           </button>
+          {opens && (
+            <button
+              type="button"
+              {...dragProps}
+              onClick={() => onOpen?.(node)}
+              className="flex min-w-0 flex-1 items-center gap-1 py-0.5 text-left text-sm text-muted-foreground hover:text-foreground"
+            >
+              {icon?.(node, isOpen) ?? <Folder className="h-4 w-4 shrink-0" />}
+              <span className="truncate">{node.name}</span>
+            </button>
+          )}
           {rowEnd?.(node)}
         </div>
         {isOpen &&
@@ -328,6 +360,10 @@ export interface FileTreeProps<N extends TreeNode> {
   rootLabel?: string;
   actions?: TreeAction<N>[];
   onOpen?: (node: N) => void;
+  /** Folder rows this accepts are ALSO openable: the chevron folds them, the name calls `onOpen`.
+   *  For a folder that is one thing rather than a place — a module, which holds its assets and is
+   *  edited as a whole. Omit and every folder row folds on click, which is the default. */
+  opensOnName?: (node: N) => boolean;
   /** Drop OS files into a folder. Omit and file drags are refused. FLAT: a dropped folder
    *  never reaches this, because `dataTransfer.files` cannot carry one. */
   onDropFiles?: (dir: string, files: File[]) => void;
@@ -358,6 +394,7 @@ export function FileTree<N extends TreeNode>({
   rootLabel,
   actions = [],
   onOpen,
+  opensOnName,
   onDropFiles,
   onDropTree,
   onMove,
@@ -502,7 +539,10 @@ export function FileTree<N extends TreeNode>({
       onDragOver={(e) => {
         const moving = draggedPath(e);
         if (moving !== null && !onMove) return;
-        if (moving === null && !(acceptsFiles(e) && (onDropTree ?? onDropFiles)))
+        if (
+          moving === null &&
+          !(acceptsFiles(e) && (onDropTree ?? onDropFiles))
+        )
           return;
         e.preventDefault();
         e.dataTransfer.dropEffect = moving === null ? "copy" : "move";
@@ -543,6 +583,7 @@ export function FileTree<N extends TreeNode>({
           dropTarget={dropTarget}
           onToggle={toggle}
           onOpen={onOpen}
+          opensOnName={opensOnName}
           onDropTarget={setDropTarget}
           onDropFiles={onDropFiles}
           onDropTree={onDropTree}

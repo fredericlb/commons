@@ -7,7 +7,7 @@
 //
 //   node scripts/i18n-migration/extract-catalogue.mjs <path/to/i18n.ts> <app-dir>
 //
-// Proven on obscura/editor (86 keys × en/fr). Delete this directory once
+// Proven on z0/editor (86 keys × en/fr). Delete this directory once
 // every app is on Paraglide.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";

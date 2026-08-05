@@ -1,7 +1,7 @@
 # commons
 
 The shared base of the frediverse monorepos. Consumed as a **git submodule**
-mounted at `commons/` by [studio](../studio) (radiok7, lanes, obscura) and
+mounted at `commons/` by [studio](../studio) (radiok7, lanes, z0) and
 [phare](../phare) (vestibule, calepin, routine, douane, labs).
 
 ```

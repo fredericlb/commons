@@ -16,7 +16,7 @@
 // CAVEAT: the import rewrite only matches `import { t } from "…";` exactly.
 // A file importing { t, tOr } or { locale, t } must be untangled by hand first.
 //
-// Proven on obscura/editor (84 call sites). Delete this directory once
+// Proven on z0/editor (84 call sites). Delete this directory once
 // every app is on Paraglide.
 
 import { readFileSync, writeFileSync } from "node:fs";

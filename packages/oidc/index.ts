@@ -20,7 +20,7 @@
 // origin, so anything host-shaped is derived from the incoming request instead:
 // the redirect_uri (see redirectUriFor), the post-login target (a relative path
 // — "/" unless the SPA passed ?return_to=, see safeReturnTarget), and the
-// cookie's Secure flag. See apps/obscura for the same pattern.
+// cookie's Secure flag. See apps/z0 for the same pattern.
 //
 // If OIDC_ISSUER / OIDC_CLIENT_ID are absent, the server falls back to a DEV
 // AUTH stub (a single "Dev User") so the app is runnable locally without an
@@ -36,7 +36,7 @@ import { type Client, generators, Issuer } from "openid-client";
 // The other way in: HMAC bearer tokens for clients that can't hold a cookie.
 export { type ApiTokens, createApiTokens } from "./apiToken.ts";
 // Host derivation (publicOrigin, redirectUriFor) lives in the shared
-// @frediverse/http/origin module so this stack and obscura's keep ONE copy.
+// @frediverse/http/origin module so this stack and z0's keep ONE copy.
 // Re-exported here so existing importers of @frediverse/oidc are unaffected.
 export { publicOrigin, redirectUriFor };
 
@@ -48,7 +48,7 @@ const ALL_ROUTES: AuthRoute[] = ["login", "callback", "logout", "me"];
 /**
  * The principal stored in the session cookie. `groups` comes from the IdP
  * (see isAdmin); the index signature lets an app carry its own fields via
- * `mapUser` (obscura tags each session with a `kind`).
+ * `mapUser` (z0 tags each session with a `kind`).
  */
 export interface SessionUser {
   sub?: string;
@@ -70,7 +70,7 @@ export interface AuthOptions {
   scopes?: string[];
   /**
    * Which built-in routes to mount. Default: all. An app that answers one of
-   * these itself (obscura's /auth/me carries extra gate flags) omits it here
+   * these itself (z0's /auth/me carries extra gate flags) omits it here
    * rather than relying on registration order to shadow ours.
    */
   mountRoutes?: AuthRoute[];
@@ -84,7 +84,7 @@ export interface AuthOptions {
 
 /**
  * Case-insensitive group membership test — the shared authorization primitive
- * on top of the `groups` claim (obscura's auth.go used strings.EqualFold).
+ * on top of the `groups` claim (z0's auth.go used strings.EqualFold).
  * Pure: the caller passes its own admin list, since which groups are
  * privileged is per-app config, not per-IdP.
  */
@@ -175,7 +175,7 @@ export function sessionCookieHeader(
  *
  * For code that runs OUTSIDE the express middleware chain and so never gets a
  * populated `req.session` — in practice a WebSocket upgrade, which is a raw
- * http `upgrade` event (see obscura's ws.ts). Returns null when the cookie
+ * http `upgrade` event (see z0's ws.ts). Returns null when the cookie
  * is absent, tampered with, or expired.
  */
 export function sessionFromCookieHeader(
@@ -207,7 +207,7 @@ export function sessionFromCookieHeader(
 
 // Validate the post-login redirect. Relative paths always pass; an absolute URL
 // must be THIS origin; everything else reduces to APP_ROOT, so the login flow
-// can't be used as an open redirect. (Same rule as obscura's own
+// can't be used as an open redirect. (Same rule as z0's own
 // safeReturnTarget — single origin means same-origin is the whole allowlist.)
 export function safeReturnTarget(target: string, req: Request): string {
   if (!target) return APP_ROOT;

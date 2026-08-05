@@ -54,6 +54,23 @@ Two traps live in `lib/droppedEntries.ts`, both of which fail *silently*:
   It has to be called until it answers an empty one, or a big folder arrives
   quietly truncated.
 
+## A folder that is also a thing you open
+
+Clicking a folder row folds it. That is right for a *place*, and wrong for a
+folder that is one **thing** — studio's modules are a folder holding a
+definition and the assets it loads, and the point of the row is to open the
+module.
+
+`opensOnName(node)` marks those rows: the chevron folds them, and the name
+calls `onOpen` like a leaf's does. It also makes them highlight on `activePath`,
+since a row you select is a row that should look selected.
+
+Two targets on one row is a cost, so it is opt-in and off by default — omit the
+prop and every folder folds on click, exactly as before. Reach for it when the
+alternative is making the row a leaf, because a leaf cannot hold children and,
+more quietly, cannot be a **drop target**: a drop on a leaf lands in its parent,
+so a folder you can drop *into* has to be a folder.
+
 ## What it does not own
 
 The node type. `TreeNode` is the minimum (`name`, `path`, `dir?`, `children?`)

@@ -28,7 +28,7 @@ describe("@frediverse/http/route stays bundle-safe", () => {
 
   it("does not reach for req.user — that lives in ./express", () => {
     // Keeps ./route importable by a backend that declares its own richer user
-    // shape (obscura, lanes) without a declaration-merging clash.
+    // shape (z0, lanes) without a declaration-merging clash.
     expect(CODE).not.toContain("req.user");
   });
 });

@@ -36,7 +36,7 @@
 /* Frediverse type. Faster One is the app-title face (display only, 400 weight —
    never use it below ~24px or for body copy); Palanquin is the body face. Both
    come from Google Fonts and must be linked in the consuming app's index.html.
-   An app with its own identity (acu's Noto/CJK, obscura's Press Start 2P)
+   An app with its own identity (acu's Noto/CJK, z0's Press Start 2P)
    overrides these in its own stylesheet. */
 /* `static` so both vars are always emitted: Tailwind tree-shakes unused theme
    vars, and --font-display has no utility usage yet in most apps — but legacy

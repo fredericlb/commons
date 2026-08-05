@@ -5,14 +5,14 @@
 // app URL in the environment. Anything absolute (the OIDC redirect_uri, the
 // cookie's Secure flag, a canonical link) is derived from the incoming request
 // instead. These two helpers are that derivation, and they were living verbatim
-// in both @frediverse/oidc (openid-client based) and apps/obscura's
+// in both @frediverse/oidc (openid-client based) and apps/z0's
 // hand-rolled auth (jose based). Extracted here so the two auth stacks share
 // ONE copy without either taking on the other's dependencies. Reachable as
 // @frediverse/http/origin — its own entry point, so importing it never drags
 // in the routing helpers' `req.user` augmentation.
 //
 // NOTE: safeReturnTarget is deliberately NOT here. The two stacks' versions
-// have diverged in observable, test-locked ways (obscura returns a
+// have diverged in observable, test-locked ways (z0 returns a
 // same-origin absolute URL unchanged; @frediverse/oidc reduces it to a path,
 // and additionally rejects protocol-relative "//host" targets). Unifying it
 // would be an auth behaviour change, so it stays local to each.
