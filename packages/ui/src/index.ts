@@ -11,6 +11,7 @@
 // therefore requires react-hook-form to be installed.
 
 export * from "./alert";
+export * from "./app-header";
 export * from "./avatar";
 export * from "./badge";
 export * from "./button";
@@ -23,6 +24,7 @@ export * from "./field";
 export * from "./file-tree";
 export * from "./form";
 export * from "./frediverse-mark";
+export * from "./hamburger-menu";
 export * from "./input";
 export * from "./label";
 export * from "./popover";
