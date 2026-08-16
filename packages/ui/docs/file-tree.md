@@ -12,6 +12,19 @@ component, so the two behave identically instead of drifting.
   first behaviour on a project switch and the second on every 2 s poll — one
   prop covers both, and getting it wrong is how a sidebar "randomly" collapses.
 
+  `additiveReveal` drops the collapse: a `reveal` change still opens the
+  target's ancestors but every other toggle stays as the user left it. That is
+  for a tree that must remember where it was — calepin's phone layout swaps
+  the tree out for the selected note and back (`reveal` passing through
+  `null`), and the reset would fold everything on every round trip.
+
+  `open` + `onOpenChange` hand the map itself to the caller: every write —
+  toggles and reveals alike — comes back through the callback, and the tree
+  renders whatever it is given. That is what persistence needs, and it stays
+  outside this component on purpose: only the app knows where folds may be
+  kept (calepin hashes them into localStorage rather than write plaintext
+  paths to disk). Pass both or neither — `open` alone is a frozen tree.
+
   A caller that wraps its nodes in a **synthetic root row** — one whose `path`
   is `""`, which is the only way to get a visible top level, since `rootLabel`
   only names the background menu's target — is covered too. Prefix-building

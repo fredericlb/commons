@@ -353,6 +353,18 @@ export interface FileTreeProps<N extends TreeNode> {
    * own toggles are kept.
    */
   reveal?: string | null;
+  /** Reveal without the collapse: a change opens the target's ancestors and
+   *  leaves every other toggle exactly as the user left it. For a tree that
+   *  must remember where it was — a phone layout leaves the tree for the
+   *  selected note and comes back, and the reset would fold everything.
+   *  Off by default: the collapse is what a project switch wants. */
+  additiveReveal?: boolean;
+  /** Own the expansion instead of letting the tree keep it: pass the map and
+   *  apply every `onOpenChange` back into it. For remembering folds across
+   *  reloads, which only the app can do — it knows where state may be kept.
+   *  Both or neither: `open` without the callback is a frozen tree. */
+  open?: Record<string, boolean>;
+  onOpenChange?: (open: Record<string, boolean>) => void;
   /** Pinned into place above the tree, outside its scroll. */
   header?: ReactNode;
   /** Where a drop onto empty space lands, and what the background menu targets. */
@@ -389,6 +401,9 @@ export function FileTree<N extends TreeNode>({
   nodes,
   activePath,
   reveal,
+  additiveReveal = false,
+  open: controlledOpen,
+  onOpenChange,
   header,
   rootPath = "",
   rootLabel,
@@ -407,13 +422,32 @@ export function FileTree<N extends TreeNode>({
 }: FileTreeProps<N>) {
   const acceptsFiles = acceptsFileDrop ?? defaultAcceptsFiles;
 
-  // Expansion per folder. Re-seeded only when `reveal` itself changes.
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Expansion per folder. Re-seeded only when `reveal` itself changes. When
+  // the caller owns the map, every write goes through onOpenChange instead —
+  // one applyOpen so the reveal logic never knows which mind it is in.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState<
+    Record<string, boolean>
+  >({});
+  const open = controlledOpen ?? uncontrolledOpen;
+  const openRef = useRef(open);
+  openRef.current = open;
+  const controlled = controlledOpen !== undefined;
+  const applyOpen = (
+    updater: (o: Record<string, boolean>) => Record<string, boolean>,
+  ) => {
+    if (!controlled) return setUncontrolledOpen(updater);
+    const next = updater(openRef.current);
+    if (next !== openRef.current) onOpenChange?.(next);
+  };
+  // The reveal effect reaches it through a ref: applyOpen is rebuilt per
+  // render, and listing it as a dependency would rerun the effect constantly.
+  const applyOpenRef = useRef(applyOpen);
+  applyOpenRef.current = applyOpen;
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const prevReveal = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const anc = ancestorsOf(reveal);
-    if (prevReveal.current !== reveal) {
+    if (!additiveReveal && prevReveal.current !== reveal) {
       prevReveal.current = reveal;
       const next: Record<string, boolean> = {};
       const visit = (list: TreeNode[]) => {
@@ -424,12 +458,12 @@ export function FileTree<N extends TreeNode>({
           }
       };
       visit(nodes);
-      setOpen(next);
+      applyOpenRef.current(() => next);
       return;
     }
     if (!anc.size) return;
     // Same target, tree refreshed: keep it revealed without discarding the user's toggles.
-    setOpen((o) => {
+    applyOpenRef.current((o) => {
       let changed = false;
       const next = { ...o };
       for (const p of anc)
@@ -439,9 +473,10 @@ export function FileTree<N extends TreeNode>({
         }
       return changed ? next : o;
     });
-  }, [reveal, nodes]);
+  }, [reveal, nodes, additiveReveal]);
 
-  const toggle = (path: string) => setOpen((o) => ({ ...o, [path]: !o[path] }));
+  const toggle = (path: string) =>
+    applyOpen((o) => ({ ...o, [path]: !o[path] }));
 
   // The open menu: its target, where to draw it, and the action currently prompting.
   const [menu, setMenu] = useState<{
