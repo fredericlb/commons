@@ -117,6 +117,7 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
                     >
                       {item.icon}
                       {item.label}
+                      {item.trailing}
                     </Button>
                   ))}
                 </nav>

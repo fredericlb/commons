@@ -38,7 +38,7 @@ to avoid.
 `AppHeaderItem` is `HamburgerMenuItem`:
 
 ```ts
-{ label, icon?, onClick, active?, separatorBefore?, danger? }
+{ label, icon?, onClick, active?, separatorBefore?, danger?, trailing? }
 ```
 
 - `active` — the entry the app is on. Pressed (`secondary`) inline on the plain
@@ -46,6 +46,14 @@ to avoid.
 - `separatorBefore` — a rule above the entry in the menu, to keep "log out"
   apart from the pages. Inline it does nothing.
 - `danger` — destructive colouring, inline and in the menu.
+- `trailing` — a node drawn after the label, inline and in the menu: a count, a
+  badge, a dot. In the menu it sits before the tick, so a column still aligns.
+
+  A node and not a number, because what goes there belongs to the app — st0
+  draws how many items each section holds, muted and tabular. It is kept OUT of
+  `label` on purpose: the label is the string the menu ticks and `aria-current`
+  announces, so a count folded into it would be read aloud as part of the page's
+  name and would change every time the catalogue did.
 
 Entries are plain `onClick`s on purpose: this package does not know which
 router an app uses. An app on react-router passes `() => navigate("/x")` and

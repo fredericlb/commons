@@ -24,6 +24,17 @@ export interface HamburgerMenuItem {
   separatorBefore?: boolean;
   /** Styled as destructive (log out, delete). */
   danger?: boolean;
+  /**
+   * Drawn after the label, inline and in the menu: a count, a badge, a dot.
+   *
+   * A node rather than a number, because what an app puts there is its own — st0 draws how many
+   * items a section holds, muted and tabular. Kept OUT of `label` deliberately: the label is the
+   * string the menu ticks and `aria-current` announces, and a count folded into it would be read
+   * aloud as part of the page's name and would change every time the catalogue did.
+   *
+   * In the menu it sits before the tick, so a column of entries still aligns.
+   */
+  trailing?: React.ReactNode;
 }
 
 export interface HamburgerMenuProps {
@@ -65,6 +76,7 @@ function HamburgerMenu({
             >
               {item.icon}
               <span className="flex-1">{item.label}</span>
+              {item.trailing}
               {item.active ? <Check className="size-4 opacity-70" /> : null}
             </DropdownMenuItem>
           </React.Fragment>
