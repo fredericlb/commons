@@ -45,6 +45,10 @@
 @theme static {
   --font-sans: "Palanquin", system-ui, sans-serif;
   --font-display: "Faster One", "Palanquin", system-ui, sans-serif;
+  /* The app NAME, as AppHeader sets it: Nabla, a colour (COLRv1) display face
+     from Google Fonts — link `family=Nabla` in the app's index.html, or the
+     name falls back to the display face above. Never for anything but a name. */
+  --font-brand: "Nabla", "Faster One", "Palanquin", system-ui, sans-serif;
 }
 
 @theme inline {

@@ -53,7 +53,12 @@ export const TitleOnly: Story = {
   args: { subtitle: undefined, items: [] },
 };
 
-/** The neutral look, for an app whose page carries the colour: routine's tabs. */
+/** The solid accent bar, opt-in. */
+export const Accent: Story = {
+  args: { variant: "accent" },
+};
+
+/** The neutral card look, opt-in. */
 export const Plain: Story = {
   args: {
     variant: "plain",
@@ -85,7 +90,6 @@ export const PlainMobile: Story = {
 /** `actions` stay inline on every width — a lock button beside the hamburger. */
 export const WithActions: Story = {
   args: {
-    variant: "plain",
     title: "🔐 calepin",
     subtitle: "dev",
     items: [

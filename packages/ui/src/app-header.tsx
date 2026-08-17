@@ -3,11 +3,11 @@ import { Button } from "./button";
 import { HamburgerMenu, type HamburgerMenuItem } from "./hamburger-menu";
 import { cn } from "./lib/utils";
 
-// The app bar every frediverse SPA shares: the app title on the left, its
-// top-level entries on the right — inline buttons from `sm` up, collapsed into
-// a hamburger menu below. Two looks: `accent` (primary background, white text)
-// and `plain` (card background, a rule underneath) for the apps whose page is
-// the accent. See docs/app-header.md.
+// The app bar every frediverse SPA shares: the app NAME on the left in the
+// brand face (Nabla), its top-level entries on the right — inline buttons from
+// `sm` up, collapsed into a hamburger menu below. The house look is `tint`:
+// the accent at 20 % over the page. `accent` (solid primary) and `plain` (card)
+// remain for an app that has a reason. See docs/app-header.md.
 
 export type AppHeaderItem = HamburgerMenuItem;
 
@@ -25,7 +25,8 @@ export interface AppHeaderProps
    * those are `items`, and belong behind the hamburger on a phone.
    */
   actions?: React.ReactNode;
-  variant?: "accent" | "plain";
+  /** `tint` (the default) is the house look; the other two are opt-in. */
+  variant?: "tint" | "accent" | "plain";
   /**
    * Cap and centre the bar's content (`max-w-3xl mx-auto`), for an app whose
    * page is a centred column and wants the bar to line up with it.
@@ -34,6 +35,14 @@ export interface AppHeaderProps
 }
 
 const VARIANT = {
+  tint: {
+    // A tint, not a fill: the page shows through, and the bar reads as part
+    // of it rather than a lid on top.
+    bar: "border-b border-primary/20 bg-primary/20 text-foreground",
+    button: "",
+    activeButton: "",
+    subtitle: "text-muted-foreground",
+  },
   accent: {
     bar: "bg-primary text-primary-foreground",
     button:
@@ -56,7 +65,7 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
       subtitle,
       items = [],
       actions,
-      variant = "accent",
+      variant = "tint",
       contained = false,
       className,
       children,
@@ -78,7 +87,11 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
           )}
         >
           <div className="flex min-w-0 items-baseline gap-3">
-            <span className="truncate font-serif text-lg">{title}</span>
+            {/* The name in the brand face. Nabla is a colour font and paints
+                itself; the size is generous because it is built for it. */}
+            <span className="truncate font-brand text-xl leading-none">
+              {title}
+            </span>
             {subtitle ? (
               <span
                 className={cn(
@@ -102,12 +115,13 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
                     <Button
                       key={item.label}
                       variant={
-                        item.active && variant === "plain"
+                        item.active && variant !== "accent"
                           ? "secondary"
                           : "ghost"
                       }
                       size="sm"
                       onClick={item.onClick}
+                      disabled={item.disabled}
                       aria-current={item.active ? "page" : undefined}
                       className={cn(
                         look.button,

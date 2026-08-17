@@ -7,16 +7,23 @@ the entries are inline buttons; below, they collapse into a **hamburger menu**
 its own too). One component, so every app gets the same mobile behaviour
 without each of them re-deciding it.
 
-## Two looks
+## The look
 
-- `variant="accent"` (default) — primary background, white text. For an app
-  whose bar *is* the brand colour (emplois).
-- `variant="plain"` — card background, a rule underneath, foreground text.
-  For an app whose page carries the colour and whose bar should stay quiet
-  (routine, calepin, douane).
+- `variant="tint"` (default, the house look) — the accent at 20 % over the
+  page, a matching rule underneath, foreground text. Every phare app uses it,
+  full width.
+- `variant="accent"` — solid primary, white text; `variant="plain"` — card
+  background. Both kept for an app with a reason; none has one today.
+
+The **name** is set in the brand face, `font-brand` — Nabla, a colour
+(COLRv1) display font from Google Fonts. The token lives in `theme.css` with
+Faster One and Palanquin as fallbacks, so an app that has not linked
+`family=Nabla` in its `index.html` still gets a name, just not the coloured
+one. It is for the name and nothing else: a colour font at body size is noise.
 
 `contained` caps and centres the bar's content at `max-w-3xl`, for an app whose
-page is a centred column and wants the bar aligned with it.
+page is a centred column and wants the bar aligned with it. The phare apps
+went full width instead.
 
 ## What goes where
 
@@ -38,7 +45,7 @@ to avoid.
 `AppHeaderItem` is `HamburgerMenuItem`:
 
 ```ts
-{ label, icon?, onClick, active?, separatorBefore?, danger?, trailing? }
+{ label, icon?, onClick, active?, separatorBefore?, danger?, trailing?, disabled? }
 ```
 
 - `active` — the entry the app is on. Pressed (`secondary`) inline on the plain
@@ -54,6 +61,8 @@ to avoid.
   `label` on purpose: the label is the string the menu ticks and `aria-current`
   announces, so a count folded into it would be read aloud as part of the page's
   name and would change every time the catalogue did.
+- `disabled` — shown but inert, inline and in the menu: a view you cannot
+  leave mid-task (acu's 3D while a quiz runs).
 
 Entries are plain `onClick`s on purpose: this package does not know which
 router an app uses. An app on react-router passes `() => navigate("/x")` and

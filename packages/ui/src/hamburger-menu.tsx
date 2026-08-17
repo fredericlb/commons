@@ -35,6 +35,8 @@ export interface HamburgerMenuItem {
    * In the menu it sits before the tick, so a column of entries still aligns.
    */
   trailing?: React.ReactNode;
+  /** Shown but inert — a view you cannot leave mid-task. */
+  disabled?: boolean;
 }
 
 export interface HamburgerMenuProps {
@@ -68,6 +70,7 @@ function HamburgerMenu({
             {item.separatorBefore ? <DropdownMenuSeparator /> : null}
             <DropdownMenuItem
               onClick={item.onClick}
+              disabled={item.disabled}
               aria-current={item.active ? "page" : undefined}
               className={cn(
                 item.active && "font-medium",
