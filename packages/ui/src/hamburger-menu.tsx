@@ -1,10 +1,11 @@
-import { Menu } from "lucide-react";
-import type * as React from "react";
+import { Check, Menu } from "lucide-react";
+import * as React from "react";
 import { Button } from "./button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { cn } from "./lib/utils";
@@ -17,6 +18,12 @@ export interface HamburgerMenuItem {
   label: string;
   icon?: React.ReactNode;
   onClick: () => void;
+  /** The entry the app is currently on — ticked in the menu, pressed inline. */
+  active?: boolean;
+  /** Draw a rule above this entry: keeps "log out" apart from the pages. */
+  separatorBefore?: boolean;
+  /** Styled as destructive (log out, delete). */
+  danger?: boolean;
 }
 
 export interface HamburgerMenuProps {
@@ -44,12 +51,23 @@ function HamburgerMenu({
           <Menu className="size-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="min-w-44">
         {items.map((item) => (
-          <DropdownMenuItem key={item.label} onClick={item.onClick}>
-            {item.icon}
-            {item.label}
-          </DropdownMenuItem>
+          <React.Fragment key={item.label}>
+            {item.separatorBefore ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem
+              onClick={item.onClick}
+              aria-current={item.active ? "page" : undefined}
+              className={cn(
+                item.active && "font-medium",
+                item.danger && "text-destructive focus:text-destructive",
+              )}
+            >
+              {item.icon}
+              <span className="flex-1">{item.label}</span>
+              {item.active ? <Check className="size-4 opacity-70" /> : null}
+            </DropdownMenuItem>
+          </React.Fragment>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
