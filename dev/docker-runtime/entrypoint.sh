@@ -8,8 +8,12 @@
 #
 # If either process dies, tear both down so the container exits and the
 # orchestrator recycles it, instead of limping along with half the stack up.
-# (studio's z0 deliberately supervises/restarts its backend instead and ships
-# its own entrypoint — see that repo's apps/z0/docker/entrypoint.sh.)
+#
+# A monolith image makes its CMD a LAUNCHER rather than one server — phare's and
+# studio's `run-backends.sh` — which spawns several backends and applies this same
+# rule to the set: it exits as soon as any one of them does. studio's z0 used to
+# override this file to restart its own backend in place; it lost that when it
+# joined the studio image, since a shared container has one lifecycle.
 set -e
 
 if [ "$#" -eq 0 ]; then
