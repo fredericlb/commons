@@ -3,10 +3,12 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { mergeConfig, type ProxyOptions, type UserConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 // The Vite setup every SPA in this monorepo repeated verbatim: React +
-// Tailwind v4, the `@` -> src alias, and the single-origin dev proxy that
-// mirrors what nginx does in the image (SPA at /, backend at /api).
+// Tailwind v4, the `@` -> src alias, the single-origin dev proxy that
+// mirrors what nginx does in the image (SPA at /, backend at /api), and the
+// service worker that makes it installable. See docs/pwa.md for that last one.
 //
 //   export default defineAppConfig({
 //     dir: import.meta.url,
@@ -49,9 +51,25 @@ export interface AppConfigOptions {
   poll?: boolean;
   /** Path prefix the app is served under. Defaults to "/" (the convention). */
   base?: string;
+  /**
+   * Navigations the service worker must NOT answer with this app's shell.
+   *
+   * Only an app served at the ORIGIN ROOT needs this. A worker's scope is the directory it was
+   * served from, so an app under a `base` already controls nothing but its own prefix — while an
+   * app at `/` controls the whole origin, its neighbours included. See docs/pwa.md.
+   */
+  pwaDenylist?: RegExp[];
+  /** No service worker for this app. See docs/pwa.md for when that is the right answer. */
+  pwa?: false;
   /** App-specific config, merged over the preset. */
   extend?: UserConfig;
 }
+
+/**
+ * Building, rather than serving — read off the CLI because this returns a plain object and there
+ * is no `({ command })` to close over. It gates one thing: `clientsClaim`.
+ */
+const IS_BUILD = process.argv.includes("build");
 
 export function defineAppConfig(options: AppConfigOptions): UserConfig {
   const dir = options.dir.startsWith("file:")
@@ -121,7 +139,52 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
 
   const preset: UserConfig = {
     ...(options.base ? { base: options.base } : {}),
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      ...(options.pwa === false
+        ? []
+        : [
+            VitePWA({
+              // No forced reload, ever: the worker waits until every tab of this origin is
+              // closed. `autoUpdate` would swap a running app's bundle out from under it, and
+              // the shell left behind then asks for chunks the new precache no longer has.
+              registerType: "prompt",
+              // The app owns its `public/manifest.webmanifest`: name, icons and start_url are
+              // its identity, not a preset's. st0 ships TWO and swaps between them.
+              manifest: false,
+              // Registered by the app, where its other document-level decisions live.
+              injectRegister: null,
+              workbox: {
+                globPatterns: [
+                  "**/*.{js,css,html,ico,png,svg,webmanifest,woff2}",
+                ],
+                // An SPA route has no file behind it, so a navigation gets the shell. Relative,
+                // so it resolves against the worker's own scope and an app under a `base` needs
+                // no special case.
+                navigateFallback: "index.html",
+                ...(options.pwaDenylist
+                  ? { navigateFallbackDenylist: options.pwaDenylist }
+                  : {}),
+                cleanupOutdatedCaches: true,
+                // Claim open pages in DEV only. A browser offers to install an app once a worker
+                // CONTROLS the page; without this the affordance waits for a second navigation,
+                // which nobody performs on a tablet. Off in a build for the reason above.
+                clientsClaim: !IS_BUILD,
+                skipWaiting: !IS_BUILD,
+                maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+              },
+              // On in dev, because with no worker there is no worker at all — and the browser
+              // then never offers to install, while the manifest and icons make everything LOOK
+              // ready. It precaches nothing before a build.
+              devOptions: {
+                enabled: true,
+                type: "module",
+                suppressWarnings: true,
+              },
+            }),
+          ]),
+    ],
     resolve: { alias: { "@": path.resolve(dir, "src") } },
     server: {
       host: true,
