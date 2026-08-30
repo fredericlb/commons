@@ -2,7 +2,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { mergeConfig, type ProxyOptions, type UserConfig } from "vite";
+import {
+  mergeConfig,
+  type PluginOption,
+  type ProxyOptions,
+  type UserConfig,
+} from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 // The Vite setup every SPA in this monorepo repeated verbatim: React +
@@ -70,6 +75,31 @@ export interface AppConfigOptions {
  * is no `({ command })` to close over. It gates one thing: `clientsClaim`.
  */
 const IS_BUILD = process.argv.includes("build");
+
+/**
+ * A socket that resets must not take the dev server with it. An `upgrade` whose URL matches no
+ * proxy context is handed to nobody — Vite's proxy loop simply returns — so the raw socket keeps
+ * no `error` listener and node throws the unhandled event out of the event loop: `read ECONNRESET`
+ * with a stack of nothing but `TCP.onStreamRead`, and the server gone.
+ *
+ * One listener, registered before the server accepts anything, is the whole fix. It is additive:
+ * a socket the proxy DOES claim keeps http-proxy's own handling too, and this one only logs.
+ */
+const upgradeSocketGuard: PluginOption = {
+  name: "frediverse:upgrade-socket-guard",
+  configureServer(server) {
+    server.httpServer?.on("upgrade", (req, socket) => {
+      socket.on("error", (err: NodeJS.ErrnoException) => {
+        // A browser going away mid-handshake is ordinary and not worth a line.
+        if (err.code === "ECONNRESET" || err.code === "EPIPE") return;
+        server.config.logger.warn(
+          `upgrade socket error on ${req.url}: ${err.message}`,
+          { timestamp: true },
+        );
+      });
+    });
+  },
+};
 
 export function defineAppConfig(options: AppConfigOptions): UserConfig {
   const dir = options.dir.startsWith("file:")
@@ -142,6 +172,7 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
     plugins: [
       react(),
       tailwindcss(),
+      upgradeSocketGuard,
       ...(options.pwa === false
         ? []
         : [
