@@ -24,6 +24,14 @@ FROM node:22-alpine
 # nginx serves each app's built SPA and reverse-proxies its API on the loopback.
 RUN apk add --no-cache nginx
 
+# Teach nginx about .mjs — its mime.types has no entry for it, so it falls back
+# to default_type and a module script (`new Worker(url, {type:"module"})`, a
+# dynamic import) is refused by the browser's strict MIME check. Any Vite build
+# shipping a library's .mjs worker verbatim hits this; calepin's pdf.js one did.
+# The grep makes a mime.types that stopped matching fail the build, loudly.
+RUN sed -i 's|^types {|types {\n    application/javascript                           mjs;|' /etc/nginx/mime.types \
+ && grep -q 'mjs;' /etc/nginx/mime.types
+
 # Let nginx run as ANY uid, not just root.
 #
 # The apk package owns these dirs as root:nginx, so nginx started by a
