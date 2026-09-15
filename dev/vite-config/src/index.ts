@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import {
   mergeConfig,
+  type Plugin,
   type PluginOption,
   type ProxyOptions,
   type UserConfig,
@@ -101,6 +102,29 @@ const upgradeSocketGuard: PluginOption = {
   },
 };
 
+/**
+ * An app's prefix is an address people type and link, so the BARE form has to work: vite answers
+ * `/f` under a base of `/f/` with a 404 page suggesting `/f/`, which reads like a dead link when
+ * the address was right. The edge redirects it in production; this is the dev half. See docs/base.md.
+ */
+function bareBaseRedirect(prefix: string): Plugin {
+  return {
+    name: "commons:bare-base-redirect",
+    configureServer(server) {
+      // Installed from the hook BODY, so it runs ahead of vite's own base middleware.
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        if (url !== prefix && !url.startsWith(`${prefix}?`)) return next();
+        // 302, not 301: a permanent redirect to a dev port outlives the base it was cached for.
+        res.writeHead(302, {
+          Location: `${prefix}/${url.slice(prefix.length)}`,
+        });
+        res.end();
+      });
+    },
+  };
+}
+
 export function defineAppConfig(options: AppConfigOptions): UserConfig {
   const dir = options.dir.startsWith("file:")
     ? path.dirname(fileURLToPath(options.dir))
@@ -170,6 +194,7 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
   const preset: UserConfig = {
     ...(options.base ? { base: options.base } : {}),
     plugins: [
+      ...(prefix ? [bareBaseRedirect(prefix)] : []),
       react(),
       tailwindcss(),
       upgradeSocketGuard,
