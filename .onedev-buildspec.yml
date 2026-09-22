@@ -19,7 +19,7 @@ jobs:
       commands: |
         npm ci
         npm run lint
-        npx turbo run test
+        npm run test
     runAs: 1000:1000
     useTTY: true
     condition: SUCCESSFUL
