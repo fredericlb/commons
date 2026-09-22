@@ -16,8 +16,8 @@
 #
 # What deliberately does NOT live here: anything app-specific (extra packages
 # like ffmpeg, the app's nginx.conf, ports, volumes, CMD). Per-app dependency
-# installs can't live here either — those are pruned per app with
-# `turbo prune`, which is scoped to one app's package set.
+# installs can't live here either — each consumer's own Dockerfile scopes its
+# own install to that app's package set.
 
 FROM node:22-alpine
 
