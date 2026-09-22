@@ -76,6 +76,27 @@ describe("safeReturnTarget", () => {
   it("rejects garbage rather than throwing", () => {
     expect(safeReturnTarget("http://[", here)).toBe("/");
   });
+
+  // Multi-origin: a login mounted on one app's origin bouncing back to a sibling's.
+  it("rejects a sibling origin when it isn't listed as trusted", () => {
+    expect(safeReturnTarget("https://k7.st0.app/pages/1", here)).toBe("/");
+  });
+
+  it("accepts a trusted origin, returned absolute so the redirect leaves this origin", () => {
+    expect(
+      safeReturnTarget("https://k7.st0.app/pages/1", here, [
+        "https://k7.st0.app",
+      ]),
+    ).toBe("https://k7.st0.app/pages/1");
+  });
+
+  it("still rejects an untrusted origin even when a trusted list is given", () => {
+    expect(
+      safeReturnTarget("https://evil.example/steal", here, [
+        "https://k7.st0.app",
+      ]),
+    ).toBe("/");
+  });
 });
 
 describe("isAdmin", () => {

@@ -29,7 +29,13 @@
 import { defineEnv, z } from "@frediverse/env";
 import { publicOrigin, redirectUriFor } from "@frediverse/http/origin";
 import cookieSession from "cookie-session";
-import type { Express, Request, RequestHandler, Response } from "express";
+import type {
+  Express,
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+} from "express";
 import Keygrip from "keygrip";
 import { type Client, generators, Issuer } from "openid-client";
 
@@ -80,6 +86,28 @@ export interface AuthOptions {
    * fields.
    */
   mapUser?: (profile: Record<string, unknown>) => SessionUser;
+  /**
+   * `Domain=` for the session cookie. Omitted (the default), falls back to
+   * env.yaml's `common.COOKIE_DOMAIN` for this service; still unset, the
+   * cookie stays host-only, exactly as before. Set this only when several
+   * apps on DIFFERENT hosts must share one cookie, e.g. ".st0.app". Pass ""
+   * explicitly to OPT OUT of the common section's value instead — for an app
+   * that is deliberately single-origin (z0) and must not pick up a sibling's
+   * cross-subdomain setting. Also switches SameSite from Lax to None (see
+   * sessionMiddleware): a cross-site fetch or <audio>/<img> load never
+   * carries a Lax cookie, only a top-level navigation does, so sharing a
+   * cookie across subdomains for anything but the login redirect needs
+   * None — which requires HTTPS.
+   */
+  cookieDomain?: string;
+  /**
+   * Extra origins safeReturnTarget accepts besides this request's own — for a
+   * login mounted on one app's origin that must bounce the browser back to
+   * another. Omitted (the default), falls back to env.yaml's
+   * `common.TRUSTED_ORIGINS` (comma-separated) for this service; still
+   * unset, only the request's own origin is trusted, exactly as before.
+   */
+  trustedOrigins?: string[];
 }
 
 /**
@@ -133,20 +161,28 @@ const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 export function sessionMiddleware(opts: {
   cookieName: string;
   secret: string;
+  /** `Domain=` — omitted keeps the cookie host-only, as before. */
+  domain?: string;
 }): RequestHandler {
   return cookieSession({
     name: opts.cookieName,
     keys: [opts.secret],
     httpOnly: true,
-    // Frontend and backend are same-origin, so Lax cookies are sent on these
-    // calls without needing HTTPS.
-    sameSite: "lax",
-    // `secure` is deliberately omitted, not hardcoded: cookie-session then
-    // lets the `cookies` lib decide per request (Secure over https, plain
-    // over local http), reading req.protocol — which honours the edge's
-    // X-Forwarded-Proto thanks to `trust proxy`. Pinning it to a constant
-    // would either drop the flag in prod or make the lib throw ("Cannot send
-    // secure cookie over unencrypted connection") in dev.
+    domain: opts.domain,
+    // Lax is sent on a same-origin call, and on a cross-site TOP-LEVEL
+    // navigation (the /auth/login redirect) — but never on a cross-site
+    // fetch/XHR or a cross-site <audio>/<img> load, no matter what
+    // `credentials`/CORS say. With a `domain` set, that IS the normal case
+    // (st0 calling pl8's API), so the cookie must be None instead — which
+    // browsers refuse to set without Secure, hence the pairing below.
+    sameSite: opts.domain ? "none" : "lax",
+    // `secure` is normally left undefined so the `cookies` lib decides per
+    // request (Secure over https, plain over local http), reading
+    // req.protocol — which honours the edge's X-Forwarded-Proto thanks to
+    // `trust proxy`. A `domain` forces it true instead: SameSite=None with
+    // Secure absent is not "maybe insecure", it's a cookie the browser drops
+    // outright — so a cross-subdomain deployment must be HTTPS, full stop.
+    secure: opts.domain ? true : undefined,
     maxAge: SESSION_MAX_AGE_MS,
   });
 }
@@ -206,10 +242,15 @@ export function sessionFromCookieHeader(
 }
 
 // Validate the post-login redirect. Relative paths always pass; an absolute URL
-// must be THIS origin; everything else reduces to APP_ROOT, so the login flow
-// can't be used as an open redirect. (Same rule as z0's own
-// safeReturnTarget — single origin means same-origin is the whole allowlist.)
-export function safeReturnTarget(target: string, req: Request): string {
+// must be THIS origin or one of trustedOrigins; everything else reduces to
+// APP_ROOT, so the login flow can't be used as an open redirect. (Same rule as
+// z0's own safeReturnTarget — single origin means same-origin is the whole
+// allowlist, unless the caller names siblings it shares a cookie with.)
+export function safeReturnTarget(
+  target: string,
+  req: Request,
+  trustedOrigins?: string[],
+): string {
   if (!target) return APP_ROOT;
   // A protocol-relative "//evil.example" is absolute to the browser but would
   // read as a path here, so reject it before anything else.
@@ -217,9 +258,10 @@ export function safeReturnTarget(target: string, req: Request): string {
   if (target.startsWith("/")) return target;
   try {
     const url = new URL(target);
-    return url.origin === publicOrigin(req)
-      ? `${url.pathname}${url.search}${url.hash}`
-      : APP_ROOT;
+    if (url.origin === publicOrigin(req)) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+    return trustedOrigins?.includes(url.origin) ? url.toString() : APP_ROOT;
   } catch {
     return APP_ROOT;
   }
@@ -240,16 +282,46 @@ export async function setupAuth(
   // Resolved through @frediverse/env so these come from the caller's section in
   // the root env.yaml (and from process.env in a container, where no yaml
   // exists) — rather than this library reaching into process.env itself.
-  const { OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, SESSION_SECRET } =
-    defineEnv(
-      {
-        OIDC_ISSUER: z.string().optional(),
-        OIDC_CLIENT_ID: z.string().optional(),
-        OIDC_CLIENT_SECRET: z.string().optional(),
-        SESSION_SECRET: z.string().default("dev-insecure-secret-change-me"),
-      },
-      { service: opts.service },
-    );
+  //
+  // COOKIE_DOMAIN/TRUSTED_ORIGINS live in env.yaml's `common` section, so this
+  // same resolution is what makes every service agree on them WITHOUT each
+  // caller having to read and pass them through by hand — which is exactly
+  // what used to go wrong: st0, pl8 and k7 each run their own cookie-session
+  // instance for the SAME "studio.sid", and one of them computing a different
+  // domain (even just "unset" vs the others' "set") makes IT stamp a second,
+  // host-only cookie that shadows the shared one on every response.
+  const {
+    OIDC_ISSUER,
+    OIDC_CLIENT_ID,
+    OIDC_CLIENT_SECRET,
+    SESSION_SECRET,
+    COOKIE_DOMAIN,
+    TRUSTED_ORIGINS,
+  } = defineEnv(
+    {
+      OIDC_ISSUER: z.string().optional(),
+      OIDC_CLIENT_ID: z.string().optional(),
+      OIDC_CLIENT_SECRET: z.string().optional(),
+      SESSION_SECRET: z.string().default("dev-insecure-secret-change-me"),
+      COOKIE_DOMAIN: z.string().optional(),
+      TRUSTED_ORIGINS: z.string().optional(),
+    },
+    { service: opts.service },
+  );
+  // An explicit option still wins — env.yaml is the common case, not the only
+  // one. `!== undefined` (not `||`) so a caller can pass "" to OPT OUT of the
+  // common section's value entirely — z0 does, being deliberately single-origin.
+  const cookieDomain =
+    opts.cookieDomain !== undefined
+      ? opts.cookieDomain || undefined
+      : COOKIE_DOMAIN || undefined;
+  const trustedOrigins =
+    opts.trustedOrigins ??
+    (TRUSTED_ORIGINS
+      ? TRUSTED_ORIGINS.split(",")
+          .map((o) => o.trim())
+          .filter(Boolean)
+      : undefined);
 
   const scope = (opts.scopes ?? ["openid", "profile", "email"]).join(" ");
   const mounted = new Set<AuthRoute>(opts.mountRoutes ?? ALL_ROUTES);
@@ -257,7 +329,11 @@ export async function setupAuth(
 
   app.set("trust proxy", 1);
   app.use(
-    sessionMiddleware({ cookieName: opts.cookieName, secret: SESSION_SECRET }),
+    sessionMiddleware({
+      cookieName: opts.cookieName,
+      secret: SESSION_SECRET,
+      domain: cookieDomain,
+    }),
   );
 
   const devMode = !OIDC_ISSUER || !OIDC_CLIENT_ID;
@@ -280,6 +356,26 @@ export async function setupAuth(
     console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
   }
 
+  // /auth/me and /auth/logout are now called cross-origin (k7.st0.app,
+  // play.st0.app calling the family root) whenever trustedOrigins is set —
+  // and a cross-origin fetch's RESPONSE is invisible to the caller's JS
+  // without these headers, credentials:"include" on the request notwithstanding.
+  // /auth/login and /auth/callback don't need this: they're top-level
+  // navigations, which CORS never governs.
+  if (trustedOrigins?.length) {
+    app.use("/auth", (req: Request, res: Response, next: NextFunction) => {
+      const origin = req.headers.origin;
+      if (origin && trustedOrigins.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      }
+      if (req.method === "OPTIONS") return res.status(204).end();
+      next();
+    });
+  }
+
   // --- Routes ---------------------------------------------------------------
   // Each is opt-out via opts.mountRoutes, for an app that answers it itself.
 
@@ -295,7 +391,9 @@ export async function setupAuth(
           email: "dev@example.com",
           groups: [],
         };
-        return res.redirect(safeReturnTarget(return_to, req));
+        return res.redirect(
+          safeReturnTarget(return_to, req, trustedOrigins),
+        );
       }
       const code_verifier = generators.codeVerifier();
       const state = generators.state();
@@ -341,7 +439,9 @@ export async function setupAuth(
         }
         session.user = toUser(profile);
         delete session.oidc;
-        res.redirect(safeReturnTarget(return_to ?? APP_ROOT, req));
+        res.redirect(
+          safeReturnTarget(return_to ?? APP_ROOT, req, trustedOrigins),
+        );
       } catch (err) {
         console.error("OIDC callback error:", (err as Error).message);
         res
@@ -359,6 +459,11 @@ export async function setupAuth(
 
   if (mounted.has("me"))
     app.get("/auth/me", (req: Request, res: Response) => {
+      // This answer changes the instant the session does (login/logout), on
+      // the SAME URL — Express's default ETag would otherwise let a browser
+      // reuse a cached body across that change via a 304, showing a stale
+      // user (or a stale 401) after the session actually flipped.
+      res.setHeader("Cache-Control", "no-store");
       if (!req.session!.user)
         return res.status(401).json({ error: "unauthenticated" });
       res.json({ user: req.session!.user });
