@@ -40,20 +40,17 @@ const VARIANT = {
     // of it rather than a lid on top.
     bar: "border-b border-primary/20 bg-primary/20 text-foreground",
     button: "",
-    activeButton: "",
     subtitle: "text-muted-foreground",
   },
   accent: {
     bar: "bg-primary text-primary-foreground",
     button:
       "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground",
-    activeButton: "bg-primary-foreground/20",
     subtitle: "text-primary-foreground/75",
   },
   plain: {
     bar: "border-b border-border bg-card text-foreground",
     button: "",
-    activeButton: "",
     subtitle: "text-muted-foreground",
   },
 } as const;
@@ -106,26 +103,24 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
 
           {children}
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 self-stretch">
             {items.length > 0 ? (
               <>
-                {/* Desktop: inline entries. */}
-                <nav className="hidden items-center gap-1 sm:flex">
+                {/* Desktop: the entries are tabs through the bar's full height — docs/app-header.md. */}
+                <nav className="-mt-3 -mb-[calc(0.75rem+1px)] hidden items-stretch gap-1 self-stretch sm:flex">
                   {items.map((item) => (
                     <Button
                       key={item.label}
-                      variant={
-                        item.active && variant !== "accent"
-                          ? "secondary"
-                          : "ghost"
-                      }
+                      variant="ghost"
                       size="sm"
                       onClick={item.onClick}
                       disabled={item.disabled}
                       aria-current={item.active ? "page" : undefined}
                       className={cn(
+                        "h-auto rounded-none rounded-t-lg px-3",
                         look.button,
-                        item.active && look.activeButton,
+                        item.active &&
+                          "bg-background text-foreground hover:bg-background hover:text-foreground",
                         item.danger && "text-destructive",
                       )}
                     >

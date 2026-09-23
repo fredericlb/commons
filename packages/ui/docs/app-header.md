@@ -25,6 +25,18 @@ one. It is for the name and nothing else: a colour font at body size is noise.
 page is a centred column and wants the bar aligned with it. The phare apps
 went full width instead.
 
+## The entries are tabs
+
+Inline, each entry runs the bar's full height, and the active one is filled
+with the **page** background (`bg-background`), rounded at the top and open at
+the bottom, where it covers the bar's bottom rule: it reads as a notebook tab
+the page hangs from, not as a pressed button floating in the bar. The nav
+cancels the bar's `py-3` with negative margins and reaches 1 px further to
+cover the rule, so the bar's padding and the tab's height move together.
+
+It depends on the page actually being painted with `bg-background` right under
+the bar; an app with a different page colour gets a tab that does not join it.
+
 ## What goes where
 
 | prop | what it is | on a phone |
@@ -48,8 +60,8 @@ to avoid.
 { label, icon?, onClick, active?, separatorBefore?, danger?, trailing?, disabled? }
 ```
 
-- `active` — the entry the app is on. Pressed (`secondary`) inline on the plain
-  variant, tinted on accent, ticked in the menu; both carry `aria-current`.
+- `active` — the entry the app is on. Inline it is a **tab**, in every variant
+  (below); in the menu it is ticked. Both carry `aria-current`.
 - `separatorBefore` — a rule above the entry in the menu, to keep "log out"
   apart from the pages. Inline it does nothing.
 - `danger` — destructive colouring, inline and in the menu.
