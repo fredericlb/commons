@@ -2,8 +2,8 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as React from "react";
 import { cn } from "./lib/utils";
 
-// Styled to match the legacy segmented control (.sidebar-tabs / .home-tabs):
-// a surface-2 track with the active segment lifted onto the surface in accent.
+// A segmented control: a secondary track, the active segment filled in the
+// primary (the house purple) so the current tab reads at a glance.
 const Tabs = TabsPrimitive.Root;
 
 const TabsList = React.forwardRef<
@@ -28,7 +28,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex-1 cursor-pointer rounded-sm px-2.5 py-1.5 text-[13px] font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm",
+      "flex-1 cursor-pointer rounded-sm px-2.5 py-1.5 text-[13px] font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm",
       className,
     )}
     {...props}
