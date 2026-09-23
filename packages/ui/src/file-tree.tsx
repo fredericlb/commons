@@ -235,6 +235,8 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     // and are edited as one row. Then the chevron folds and the NAME opens, which is two targets
     // rather than one; everywhere else the whole row folds, exactly as before.
     const opens = !!onOpen && !!opensOnName?.(node);
+    // An opens row with NOTHING under it has nothing to fold — one target, not two.
+    const hasNothingToFold = opens && !node.children?.length;
     // The whole subtree is this folder's drop zone: a nested file bubbles up, a nested folder claims itself.
     return (
       <div {...dropHandlers(node.path)}>
@@ -253,38 +255,40 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
             onContext(node, e);
           }}
         >
-          <button
-            type="button"
-            {...(opens ? {} : dragProps)}
-            onClick={locked ? undefined : () => onToggle(node.path)}
-            aria-label={
-              opens
-                ? `${isOpen ? "Collapse" : "Expand"} ${node.name}`
-                : undefined
-            }
-            className={cn(
-              "flex min-w-0 items-center gap-1 py-0.5 text-left text-sm text-muted-foreground hover:text-foreground",
-              opens ? "shrink-0" : "flex-1",
-              locked && "cursor-default",
-            )}
-          >
-            {!locked && (
-              <ChevronRight
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 transition-transform",
-                  isOpen && "rotate-90",
-                )}
-              />
-            )}
-            {!opens &&
-              (icon?.(node, isOpen) ??
-                (isOpen ? (
-                  <FolderOpen className="h-4 w-4 shrink-0" />
-                ) : (
-                  <Folder className="h-4 w-4 shrink-0" />
-                )))}
-            {!opens && <span className="truncate">{node.name}</span>}
-          </button>
+          {!hasNothingToFold && (
+            <button
+              type="button"
+              {...(opens ? {} : dragProps)}
+              onClick={locked ? undefined : () => onToggle(node.path)}
+              aria-label={
+                opens
+                  ? `${isOpen ? "Collapse" : "Expand"} ${node.name}`
+                  : undefined
+              }
+              className={cn(
+                "flex min-w-0 items-center gap-1 py-0.5 text-left text-sm text-muted-foreground hover:text-foreground",
+                opens ? "shrink-0" : "flex-1",
+                locked && "cursor-default",
+              )}
+            >
+              {!locked && (
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 transition-transform",
+                    isOpen && "rotate-90",
+                  )}
+                />
+              )}
+              {!opens &&
+                (icon?.(node, isOpen) ??
+                  (isOpen ? (
+                    <FolderOpen className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <Folder className="h-4 w-4 shrink-0" />
+                  )))}
+              {!opens && <span className="truncate">{node.name}</span>}
+            </button>
+          )}
           {opens && (
             <button
               type="button"

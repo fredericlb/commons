@@ -97,6 +97,13 @@ alternative is making the row a leaf, because a leaf cannot hold children and,
 more quietly, cannot be a **drop target**: a drop on a leaf lands in its parent,
 so a folder you can drop *into* has to be a folder.
 
+**An `opensOnName` row with an empty `children` array collapses back to one
+target.** The chevron and its toggle button do not render at all, and clicking
+anywhere on the row calls `onOpen` — there is nothing behind it to fold, so a
+second target would be a dead click. This is how the médiathèque's songs open
+straight to their editor while still being their own drop target for a
+variant: `dir: true, children: []`, never populated in the tree at all.
+
 ## What it does not own
 
 The node type. `TreeNode` is the minimum (`name`, `path`, `dir?`, `children?`)
