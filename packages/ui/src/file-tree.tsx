@@ -178,7 +178,8 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     rowEnd,
   } = props;
   const locked = !!flushRoot && depth === 0;
-  const pad = { paddingLeft: locked ? 0 : 8 + depth * 12 };
+  // flushRoot's depth 0 is 0 already, so the same step (12) carries on from there with no flat offset.
+  const pad = { paddingLeft: flushRoot ? depth * 12 : 8 + depth * 12 };
   const disabled = isDisabled?.(node) ?? false;
 
   // Both drops land on a folder, so one handler decides between them by what the drag carries.

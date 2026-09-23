@@ -35,8 +35,11 @@ component, so the two behave identically instead of drifting.
 
   `flushRoot` is for that same synthetic row: no left padding at depth 0, no
   chevron, and its children always show — clicking it does nothing, because it
-  is a section label rather than a place with contents to fold away. Depth 1
-  and below are unaffected, so a real subfolder under it still folds as usual.
+  is a section label rather than a place with contents to fold away. The step
+  below it drops the same flat offset, so depth 1 sits one indent unit in from
+  a depth 0 that starts at zero, rather than the two units it would read as
+  with the offset still under it — depth 2 two units, and so on. Folding
+  itself is untouched at depth 1 and below: a real subfolder still folds.
 - **The right-click menu**, including the inline follow-up some entries need:
   a typed `prompt` (rename, new file) or a yes/no `confirm` — mutually
   exclusive, and an entry with neither runs the moment it is picked. `confirm`
