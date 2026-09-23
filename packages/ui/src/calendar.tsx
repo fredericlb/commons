@@ -4,8 +4,9 @@ import { ChevronLeft, ChevronRight } from "./icons";
 import { cn } from "./lib/utils";
 
 // Compact month calendar for picking a day. Days in `markedDays` get a dot; the
-// selected day and today are highlighted. Month navigation is internal by
-// default (view follows `selected`), or controlled via `month`/`onMonthChange`.
+// selected day is filled and today outlined in the primary. Month navigation is
+// internal by default (view follows `selected`), or controlled via `month`/`onMonthChange`.
+// `disableFuture` stops both navigation and picking past today, for a log of what happened.
 //
 // Day keys are "YYYY-M-D" (month 0-indexed, no padding) — use `dayKey(date)`.
 
@@ -48,6 +49,8 @@ interface CalendarProps {
   /** Controlled display month "YYYY-MM". Omit for internal navigation. */
   month?: string;
   onMonthChange?: (month: string) => void;
+  /** No month after this one and no day after today: for a calendar of things already done. */
+  disableFuture?: boolean;
   className?: string;
 }
 
@@ -57,6 +60,7 @@ export function Calendar({
   markedDays,
   month,
   onMonthChange,
+  disableFuture = false,
   className,
 }: CalendarProps) {
   const controlled = month != null;
@@ -75,7 +79,16 @@ export function Calendar({
   const view = controlled ? parseMonthKey(month!) : internal;
   const year = view.getFullYear();
   const mon = view.getMonth();
-  const todayKey = dayKey(new Date());
+  const now = new Date();
+  const todayKey = dayKey(now);
+  const endOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+  );
+  const atCurrentMonth =
+    year > now.getFullYear() ||
+    (year === now.getFullYear() && mon >= now.getMonth());
 
   const daysInMonth = new Date(year, mon + 1, 0).getDate();
   // Leading blanks so the 1st lands under its weekday (Monday-start).
@@ -101,6 +114,7 @@ export function Calendar({
         <Button
           variant="outline"
           size="sm"
+          data-slot="calendar-nav"
           onClick={() => changeMonth(-1)}
           aria-label="Previous month"
         >
@@ -112,6 +126,8 @@ export function Calendar({
         <Button
           variant="outline"
           size="sm"
+          data-slot="calendar-nav"
+          disabled={disableFuture && atCurrentMonth}
           onClick={() => changeMonth(1)}
           aria-label="Next month"
         >
@@ -134,13 +150,19 @@ export function Calendar({
           const key = `${year}-${mon}-${d}`;
           const isSel = key === selected;
           const isToday = key === todayKey;
+          const isFuture =
+            disableFuture && new Date(year, mon, d) >= endOfToday;
           return (
             <button
+              type="button"
               key={key}
+              data-slot="calendar-day"
+              disabled={isFuture}
               onClick={() => onSelect(key)}
               className={cn(
-                "relative flex aspect-square items-center justify-center rounded-md text-xs text-foreground",
-                !isSel && "hover:bg-secondary",
+                "relative flex aspect-square items-center justify-center rounded-md border border-transparent text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-30",
+                !isSel && !isFuture && "hover:bg-secondary",
+                isToday && "border-primary",
                 isToday && !isSel && "font-bold text-primary",
                 isSel && "bg-primary font-bold text-primary-foreground",
               )}
