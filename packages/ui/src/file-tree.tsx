@@ -250,7 +250,10 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
             onContext(node, e);
           }}
         >
-          {!hasNothingToFold && (
+          {hasNothingToFold ? (
+            // Same width a chevron button occupies — without it the opens button below starts flush left.
+            <span className="w-3.5 shrink-0" />
+          ) : (
             <button
               type="button"
               {...(opens ? {} : dragProps)}

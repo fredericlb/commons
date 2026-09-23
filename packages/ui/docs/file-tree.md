@@ -101,9 +101,12 @@ so a folder you can drop *into* has to be a folder.
 **An `opensOnName` row with an empty `children` array collapses back to one
 target.** The chevron and its toggle button do not render at all, and clicking
 anywhere on the row calls `onOpen` — there is nothing behind it to fold, so a
-second target would be a dead click. This is how the médiathèque's songs open
-straight to their editor while still being their own drop target for a
-variant: `dir: true, children: []`, never populated in the tree at all.
+second target would be a dead click. A same-width spacer takes the button's
+place, or the row's icon and name would start flush against the padding
+instead of lined up with every sibling that still has a chevron. This is how
+the médiathèque's songs open straight to their editor while still being their
+own drop target for a variant: `dir: true, children: []`, never populated in
+the tree at all.
 
 ## What it does not own
 
