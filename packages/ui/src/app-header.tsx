@@ -40,17 +40,21 @@ const VARIANT = {
     // of it rather than a lid on top.
     bar: "border-b border-primary/20 bg-primary/20 text-foreground",
     button: "",
+    // The active tab's sides and top, in the colour of the bar's bottom rule.
+    tab: "border-primary/20",
     subtitle: "text-muted-foreground",
   },
   accent: {
     bar: "bg-primary text-primary-foreground",
     button:
       "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground",
+    tab: "border-transparent",
     subtitle: "text-primary-foreground/75",
   },
   plain: {
     bar: "border-b border-border bg-card text-foreground",
     button: "",
+    tab: "border-border",
     subtitle: "text-muted-foreground",
   },
 } as const;
@@ -117,10 +121,13 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
                       disabled={item.disabled}
                       aria-current={item.active ? "page" : undefined}
                       className={cn(
-                        "h-auto rounded-none rounded-t-lg px-3",
+                        "h-auto rounded-none border border-b-0 border-transparent px-3",
                         look.button,
                         item.active &&
-                          "bg-background text-foreground hover:bg-background hover:text-foreground",
+                          cn(
+                            "bg-background bg-clip-padding text-foreground hover:bg-background hover:text-foreground",
+                            look.tab,
+                          ),
                         item.danger && "text-destructive",
                       )}
                     >

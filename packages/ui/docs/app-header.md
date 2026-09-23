@@ -28,9 +28,12 @@ went full width instead.
 ## The entries are tabs
 
 Inline, each entry runs the bar's full height, and the active one is filled
-with the **page** background (`bg-background`), rounded at the top and open at
-the bottom, where it covers the bar's bottom rule: it reads as a notebook tab
-the page hangs from, not as a pressed button floating in the bar. The nav
+with the **page** background (`bg-background`), square, outlined on its sides
+and top in the colour of the bar's bottom rule, and open at the bottom, where it
+covers that rule: it reads as a notebook tab the page hangs from, not as a
+pressed button floating in the bar. The outline is drawn over the bar's own
+fill (`bg-clip-padding`), which is what makes it the same shade as the rule.
+Every entry carries a transparent border, so activating one shifts nothing. The nav
 cancels the bar's `py-3` with negative margins and reaches 1 px further to
 cover the rule, so the bar's padding and the tab's height move together.
 
