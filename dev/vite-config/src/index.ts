@@ -248,6 +248,8 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
       // Ports are fixed per app, so a collision should fail loudly rather than
       // silently move the app to another port.
       strictPort: true,
+      // Vite would answer a proxied path's own preflight itself — docs/cors.md.
+      cors: false,
       proxy,
       ...(options.host
         ? { allowedHosts: [options.host], hmr: { clientPort: 443 } }
