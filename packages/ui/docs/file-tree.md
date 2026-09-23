@@ -33,13 +33,14 @@ component, so the two behave identically instead of drifting.
   ancestor of everything. A tree with no such row is unaffected: nothing reads
   the extra key.
 
-  `flushRoot` is for that same synthetic row: no left padding at depth 0, no
-  chevron, and its children always show — clicking it does nothing, because it
-  is a section label rather than a place with contents to fold away. The step
-  below it drops the same flat offset, so depth 1 sits one indent unit in from
-  a depth 0 that starts at zero, rather than the two units it would read as
-  with the offset still under it — depth 2 two units, and so on. Folding
-  itself is untouched at depth 1 and below: a real subfolder still folds.
+  `collapseSingleRoot` is for that same synthetic row, and goes further: it is
+  not drawn AT ALL. When `nodes` holds exactly one top-level entry, its own
+  row is skipped and its children take its place, one depth shallower — depth
+  1 becomes depth 0, and every indent below follows. A caller passing several
+  real top-level entries is unaffected, which is why wrapping in a synthetic
+  root of exactly one stays the reliable way to reach for this: a library
+  that happens to hold a single real top-level folder would otherwise lose it
+  the same way.
 - **The right-click menu**, including the inline follow-up some entries need:
   a typed `prompt` (rename, new file) or a yes/no `confirm` — mutually
   exclusive, and an entry with neither runs the moment it is picked. `confirm`

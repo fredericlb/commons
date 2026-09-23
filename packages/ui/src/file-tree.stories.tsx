@@ -136,13 +136,13 @@ export const ReadOnly: Story = {
   ),
 };
 
-/** A single wrapping row — a section header, not a folder — as the médiathèque uses it. */
-export const WithFlushRoot: Story = {
+/** A single wrapping row, never drawn — its children show at depth 0, as the médiathèque uses it. */
+export const WithCollapsedRoot: Story = {
   render: () => (
     <div className="h-96 w-64 border border-border bg-card/40">
       <FileTree
         nodes={[{ name: "NOTES", path: "", dir: true, children: nodes }]}
-        flushRoot
+        collapseSingleRoot
       />
     </div>
   ),
