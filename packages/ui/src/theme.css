@@ -91,3 +91,10 @@
     display: none !important;
   }
 }
+
+/* Icons (docs/icons.md) sit on the text line where their parent is not a flex box. */
+svg.lucide {
+  display: inline-block;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}

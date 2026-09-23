@@ -6,6 +6,7 @@
 - **A file header is at most 10 lines.** What the file does, and the one thing a reader would get wrong.
 - **A comment inside the body is exactly one line.** No wrapped sentences, no JSDoc paragraphs.
 - Long rationale goes to the package's `docs/` page, and the code points at it.
+- **Icons come from `@frediverse/ui/icons`**, never an emoji or a direct `lucide-react` import — `packages/ui/docs/icons.md`.
 
 Never join a multi-line comment into one line to satisfy the rule: that makes an unreadable
 500-character line and can swallow a `biome-ignore` directive. Condense to a sentence, move the

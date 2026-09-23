@@ -4,13 +4,8 @@
 // Everything app-specific is a prop: the menu is a list of TreeAction, the
 // trailing widget a render prop. See packages/ui/docs/file-tree.md.
 
-import {
-  ChevronRight,
-  File as FileIcon,
-  Folder,
-  FolderOpen,
-} from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight, File as FileIcon, Folder, FolderOpen } from "./icons";
 import {
   type DroppedFile,
   dropEntries,

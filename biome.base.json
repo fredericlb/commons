@@ -46,6 +46,16 @@
         "useMediaCaption": "warn",
         "useSemanticElements": "warn"
       },
+      "style": {
+        "noRestrictedImports": {
+          "level": "warn",
+          "options": {
+            "paths": {
+              "lucide-react": "Import icons from @frediverse/ui/icons, the one set every app draws with (commons/packages/ui/docs/icons.md)."
+            }
+          }
+        }
+      },
       "suspicious": {
         "noArrayIndexKey": "warn",
         "noAssignInExpressions": "warn",

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Button } from "./button";
+import { ChevronLeft, ChevronRight } from "./icons";
 import { cn } from "./lib/utils";
 
 // Compact month calendar for picking a day. Days in `markedDays` get a dot; the
@@ -103,7 +104,7 @@ export function Calendar({
           onClick={() => changeMonth(-1)}
           aria-label="Previous month"
         >
-          ‹
+          <ChevronLeft className="size-4" />
         </Button>
         <span className="text-[13.5px] font-semibold">
           {MONTHS[mon]} {year}
@@ -114,7 +115,7 @@ export function Calendar({
           onClick={() => changeMonth(1)}
           aria-label="Next month"
         >
-          ›
+          <ChevronRight className="size-4" />
         </Button>
       </div>
 

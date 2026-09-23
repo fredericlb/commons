@@ -1,4 +1,3 @@
-import { Check, Menu } from "lucide-react";
 import * as React from "react";
 import { Button } from "./button";
 import {
@@ -8,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
+import { Check, Menu } from "./icons";
 import { cn } from "./lib/utils";
 
 // A hamburger button opening a dropdown of navigation entries — the mobile

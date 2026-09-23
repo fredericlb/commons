@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { CheckCheck, List, LogOut } from "lucide-react";
 import { HamburgerMenu } from "./hamburger-menu";
+import { CheckCheck, List, LogOut } from "./icons";
 
 const meta = {
   title: "UI/HamburgerMenu",

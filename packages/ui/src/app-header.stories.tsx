@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { AppHeader } from "./app-header";
+import { Button } from "./button";
 import {
   CheckCheck,
   InboxIcon,
@@ -6,9 +8,7 @@ import {
   LockIcon,
   LogOut,
   SettingsIcon,
-} from "lucide-react";
-import { AppHeader } from "./app-header";
-import { Button } from "./button";
+} from "./icons";
 
 const meta = {
   title: "UI/AppHeader",
