@@ -32,9 +32,14 @@ component, so the two behave identically instead of drifting.
   CLOSED and revealed nothing at all; the empty path is now treated as the
   ancestor of everything. A tree with no such row is unaffected: nothing reads
   the extra key.
-- **The right-click menu**, including the inline prompt some entries need
-  (rename, new file). A menu with nothing to offer does not open at all: an
-  empty grey box you have to dismiss is worse than the browser's own menu.
+- **The right-click menu**, including the inline follow-up some entries need:
+  a typed `prompt` (rename, new file) or a yes/no `confirm` — mutually
+  exclusive, and an entry with neither runs the moment it is picked. `confirm`
+  exists for an action too destructive for one click but with nothing to type
+  (deleting a folder that is not the one thing selected, so there is no name
+  to echo back as a prompt's answer would). A menu with nothing to offer does
+  not open at all: an empty grey box you have to dismiss is worse than the
+  browser's own menu.
 - **Drag and drop**, of two kinds that land on the same folder rows:
   - an **OS file drag** → `onDropFiles(dir, files)`, or `onDropTree(dir, files)`
     when the app can take folders (see below);

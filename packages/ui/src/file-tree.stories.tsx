@@ -51,9 +51,21 @@ const actions: TreeAction<TreeNode>[] = [
   },
   {
     key: "delete",
+    label: (t) => `Supprimer ${t.name}…`,
+    danger: true,
+    when: (t) => t.dir && !t.root,
+    // A folder can hold more than one row — nothing to type back, so this asks yes/no instead.
+    confirm: {
+      message: (t) => `Supprimer « ${t.name} » et tout ce qu'il contient ?`,
+      submit: "Supprimer",
+    },
+    run: () => undefined,
+  },
+  {
+    key: "delete-leaf",
     label: "Supprimer",
     danger: true,
-    when: (t) => !t.root,
+    when: (t) => !t.dir && !t.root,
     run: () => undefined,
   },
 ];

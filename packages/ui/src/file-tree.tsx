@@ -43,6 +43,14 @@ export interface TreePrompt<N extends TreeNode> {
   hint?: (target: TreeTarget<N>, value: string) => ReactNode;
 }
 
+/** A yes/no gate before it runs, no typing — mutually exclusive with `prompt`. */
+export interface TreeConfirm<N extends TreeNode> {
+  /** What is asked, e.g. "Delete Nirvana and everything under it?" */
+  message: (target: TreeTarget<N>) => ReactNode;
+  /** The affirmative button's label. */
+  submit: string;
+}
+
 /** One entry of the right-click menu. */
 export interface TreeAction<N extends TreeNode> {
   key: string;
@@ -52,7 +60,8 @@ export interface TreeAction<N extends TreeNode> {
   /** Styled as destructive (Delete). */
   danger?: boolean;
   prompt?: TreePrompt<N>;
-  /** `value` is the prompt's answer, or "" for a plain action. */
+  confirm?: TreeConfirm<N>;
+  /** `value` is the prompt's answer, "" for `confirm` or a plain action. */
   run: (target: TreeTarget<N>, value: string) => void;
 }
 
@@ -510,13 +519,13 @@ export function FileTree<N extends TreeNode>({
 
   const start = (action: TreeAction<N>) => {
     if (!menu) return;
-    if (!action.prompt) {
+    if (!action.prompt && !action.confirm) {
       const target = menu.target;
       closeMenu();
       action.run(target, "");
       return;
     }
-    setValue(action.prompt.initial?.(menu.target) ?? "");
+    setValue(action.prompt?.initial?.(menu.target) ?? "");
     setPrompting(action);
   };
 
@@ -526,6 +535,13 @@ export function FileTree<N extends TreeNode>({
     const target = menu.target;
     closeMenu();
     if (answer) prompting.run(target, answer);
+  };
+
+  const confirmRun = () => {
+    if (!menu || !prompting?.confirm) return;
+    const target = menu.target;
+    closeMenu();
+    prompting.run(target, "");
   };
 
   // Dismiss on Escape; an outside click is caught by the backdrop below.
@@ -666,6 +682,35 @@ export function FileTree<N extends TreeNode>({
                     className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground"
                   >
                     {prompting.prompt.submit}
+                  </button>
+                </div>
+              </div>
+            ) : prompting?.confirm ? (
+              <div className="px-2 py-1">
+                <div className="mb-1 text-xs text-muted-foreground">
+                  {prompting.confirm.message(menu.target)}
+                </div>
+                <div className="mt-1 flex justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={closeMenu}
+                    className="rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {cancelLabel}
+                  </button>
+                  <button
+                    type="button"
+                    // biome-ignore lint/a11y/noAutofocus: the prompt IS the menu now — a button you must click first is a menu that swallowed your click.
+                    autoFocus
+                    onClick={confirmRun}
+                    className={cn(
+                      "rounded px-2 py-0.5 text-xs",
+                      prompting.danger
+                        ? "bg-destructive text-destructive-foreground"
+                        : "bg-primary text-primary-foreground",
+                    )}
+                  >
+                    {prompting.confirm.submit}
                   </button>
                 </div>
               </div>
