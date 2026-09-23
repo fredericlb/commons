@@ -135,3 +135,15 @@ export const ReadOnly: Story = {
     </div>
   ),
 };
+
+/** A single wrapping row — a section header, not a folder — as the médiathèque uses it. */
+export const WithFlushRoot: Story = {
+  render: () => (
+    <div className="h-96 w-64 border border-border bg-card/40">
+      <FileTree
+        nodes={[{ name: "NOTES", path: "", dir: true, children: nodes }]}
+        flushRoot
+      />
+    </div>
+  ),
+};

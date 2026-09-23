@@ -136,6 +136,8 @@ interface RowProps<N extends TreeNode> {
   // Where a top-level row's drop lands. A leaf targets its PARENT folder, and a top-level leaf's parent is not
   // expressible as a prefix of its own path — it is the tree's root, which only the tree knows.
   rootPath: string;
+  // Depth 0 draws flush and always open — a caller's single wrapping row, not a real folder to fold.
+  flushRoot?: boolean;
   activePath?: string | null;
   open: Record<string, boolean>;
   dropTarget: string | null;
@@ -158,6 +160,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     node,
     depth,
     rootPath,
+    flushRoot,
     activePath,
     open,
     dropTarget,
@@ -174,7 +177,8 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     isDisabled,
     rowEnd,
   } = props;
-  const pad = { paddingLeft: 8 + depth * 12 };
+  const locked = !!flushRoot && depth === 0;
+  const pad = { paddingLeft: locked ? 0 : 8 + depth * 12 };
   const disabled = isDisabled?.(node) ?? false;
 
   // Both drops land on a folder, so one handler decides between them by what the drag carries.
@@ -225,7 +229,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     : {};
 
   if (node.dir) {
-    const isOpen = !!open[node.path];
+    const isOpen = locked || !!open[node.path];
     // A folder that is ALSO a thing you open — the médiathèque's modules, which hold their assets
     // and are edited as one row. Then the chevron folds and the NAME opens, which is two targets
     // rather than one; everywhere else the whole row folds, exactly as before.
@@ -251,7 +255,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
           <button
             type="button"
             {...(opens ? {} : dragProps)}
-            onClick={() => onToggle(node.path)}
+            onClick={locked ? undefined : () => onToggle(node.path)}
             aria-label={
               opens
                 ? `${isOpen ? "Collapse" : "Expand"} ${node.name}`
@@ -260,14 +264,17 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
             className={cn(
               "flex min-w-0 items-center gap-1 py-0.5 text-left text-sm text-muted-foreground hover:text-foreground",
               opens ? "shrink-0" : "flex-1",
+              locked && "cursor-default",
             )}
           >
-            <ChevronRight
-              className={cn(
-                "h-3.5 w-3.5 shrink-0 transition-transform",
-                isOpen && "rotate-90",
-              )}
-            />
+            {!locked && (
+              <ChevronRight
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 transition-transform",
+                  isOpen && "rotate-90",
+                )}
+              />
+            )}
             {!opens &&
               (icon?.(node, isOpen) ??
                 (isOpen ? (
@@ -374,6 +381,8 @@ export interface FileTreeProps<N extends TreeNode> {
   /** Where a drop onto empty space lands, and what the background menu targets. */
   rootPath?: string;
   rootLabel?: string;
+  /** Depth 0 draws flush, with no chevron, and is always open — for a synthetic wrapping row. */
+  flushRoot?: boolean;
   actions?: TreeAction<N>[];
   onOpen?: (node: N) => void;
   /** Folder rows this accepts are ALSO openable: the chevron folds them, the name calls `onOpen`.
@@ -411,6 +420,7 @@ export function FileTree<N extends TreeNode>({
   header,
   rootPath = "",
   rootLabel,
+  flushRoot,
   actions = [],
   onOpen,
   opensOnName,
@@ -624,6 +634,7 @@ export function FileTree<N extends TreeNode>({
           node={n}
           depth={0}
           rootPath={rootPath}
+          flushRoot={flushRoot}
           activePath={activePath}
           open={open}
           dropTarget={dropTarget}

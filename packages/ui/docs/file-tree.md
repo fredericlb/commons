@@ -32,6 +32,11 @@ component, so the two behave identically instead of drifting.
   CLOSED and revealed nothing at all; the empty path is now treated as the
   ancestor of everything. A tree with no such row is unaffected: nothing reads
   the extra key.
+
+  `flushRoot` is for that same synthetic row: no left padding at depth 0, no
+  chevron, and its children always show — clicking it does nothing, because it
+  is a section label rather than a place with contents to fold away. Depth 1
+  and below are unaffected, so a real subfolder under it still folds as usual.
 - **The right-click menu**, including the inline follow-up some entries need:
   a typed `prompt` (rename, new file) or a yes/no `confirm` — mutually
   exclusive, and an entry with neither runs the moment it is picked. `confirm`
