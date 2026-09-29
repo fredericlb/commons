@@ -23,7 +23,9 @@ export const wrap =
       await fn(req, res);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: (err as Error).message });
+      // A handler that failed AFTER answering cannot be answered again, and trying throws out of this catch as an unhandled rejection.
+      if (res.headersSent) res.destroy();
+      else res.status(500).json({ error: (err as Error).message });
     }
   };
 
