@@ -146,6 +146,7 @@ interface RowProps<N extends TreeNode> {
   onDropFiles?: (dir: string, files: File[]) => void;
   onDropTree?: (dir: string, files: DroppedFile[]) => void;
   onMove?: (from: string, toDir: string) => void;
+  canMove?: (node: N) => boolean;
   onContext: (node: N, e: React.MouseEvent) => void;
   acceptsFiles: (e: React.DragEvent) => boolean;
   icon?: (node: N, open: boolean) => ReactNode;
@@ -169,6 +170,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     onDropFiles,
     onDropTree,
     onMove,
+    canMove,
     onContext,
     acceptsFiles,
     icon,
@@ -215,7 +217,8 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     },
   });
 
-  const dragProps = onMove
+  const draggable = !!onMove && (canMove?.(node) ?? true);
+  const dragProps = draggable
     ? {
         draggable: true,
         onDragStart: (e: React.DragEvent) => {
@@ -402,6 +405,8 @@ export interface FileTreeProps<N extends TreeNode> {
   onDropTree?: (dir: string, files: DroppedFile[]) => void;
   /** Move a row into a folder. Omit and rows aren't draggable. */
   onMove?: (from: string, toDir: string) => void;
+  /** Which rows `onMove` may drag; omit and every row can be. Folders still take drops either way. */
+  canMove?: (node: N) => boolean;
   /** Trailing widget on a row (lanes's "open project", calepin's badges). */
   rowEnd?: (node: N) => ReactNode;
   /** Something RIGHT AFTER the name, inside the row's button — a second, quieter name (st0's module label). */
@@ -434,6 +439,7 @@ export function FileTree<N extends TreeNode>({
   onDropFiles,
   onDropTree,
   onMove,
+  canMove,
   rowEnd,
   nameEnd,
   icon,
@@ -658,6 +664,7 @@ export function FileTree<N extends TreeNode>({
           onDropFiles={onDropFiles}
           onDropTree={onDropTree}
           onMove={onMove}
+          canMove={canMove}
           onContext={onContext}
           acceptsFiles={acceptsFiles}
           icon={icon}
