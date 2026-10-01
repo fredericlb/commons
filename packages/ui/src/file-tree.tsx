@@ -151,6 +151,7 @@ interface RowProps<N extends TreeNode> {
   icon?: (node: N, open: boolean) => ReactNode;
   isDisabled?: (node: N) => boolean;
   rowEnd?: (node: N) => ReactNode;
+  nameEnd?: (node: N) => ReactNode;
 }
 
 function Row<N extends TreeNode>(props: RowProps<N>) {
@@ -173,6 +174,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     icon,
     isDisabled,
     rowEnd,
+    nameEnd,
   } = props;
   const pad = { paddingLeft: 8 + depth * 12 };
   const disabled = isDisabled?.(node) ?? false;
@@ -282,6 +284,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
                     <Folder className="h-4 w-4 shrink-0" />
                   )))}
               {!opens && <span className="truncate">{node.name}</span>}
+              {!opens && nameEnd?.(node)}
             </button>
           )}
           {opens && (
@@ -293,6 +296,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
             >
               {icon?.(node, isOpen) ?? <Folder className="h-4 w-4 shrink-0" />}
               <span className="truncate">{node.name}</span>
+              {nameEnd?.(node)}
             </button>
           )}
           {rowEnd?.(node)}
@@ -348,6 +352,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
         <span className="w-3.5 shrink-0" />
         {icon?.(node, false) ?? <FileIcon className="h-4 w-4 shrink-0" />}
         <span className="truncate">{node.name}</span>
+              {nameEnd?.(node)}
       </button>
       {rowEnd?.(node)}
     </div>
@@ -399,6 +404,8 @@ export interface FileTreeProps<N extends TreeNode> {
   onMove?: (from: string, toDir: string) => void;
   /** Trailing widget on a row (lanes's "open project", calepin's badges). */
   rowEnd?: (node: N) => ReactNode;
+  /** Something RIGHT AFTER the name, inside the row's button — a second, quieter name (st0's module label). */
+  nameEnd?: (node: N) => ReactNode;
   /** Override the default folder/file icons. */
   icon?: (node: N, open: boolean) => ReactNode;
   /** Muted and not openable, but still right-clickable. */
@@ -428,6 +435,7 @@ export function FileTree<N extends TreeNode>({
   onDropTree,
   onMove,
   rowEnd,
+  nameEnd,
   icon,
   isDisabled,
   acceptsFileDrop,
@@ -655,6 +663,7 @@ export function FileTree<N extends TreeNode>({
           icon={icon}
           isDisabled={isDisabled}
           rowEnd={rowEnd}
+          nameEnd={nameEnd}
         />
       ))}
 
