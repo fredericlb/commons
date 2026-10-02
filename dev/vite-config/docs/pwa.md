@@ -1,103 +1,111 @@
-# Le service worker que chaque app reçoit
+# The service worker every app gets
 
-`defineAppConfig` ajoute `vite-plugin-pwa` à toute app du frediverse. Ce qu'il achète est une
-**seconde ouverture** — le shell et ses assets sont précachés, donc l'app démarre du disque au
-lieu de retélécharger son bundle — et l'**installabilité** : sans worker, aucun navigateur ne
-propose d'ajouter l'app à un écran d'accueil.
+`defineAppConfig` adds `vite-plugin-pwa` to every frediverse app. What it buys is a **second
+opening** — the shell and its assets are precached, so the app starts from disk instead of
+downloading its bundle again — and **installability**: with no worker, no browser offers to add
+the app to a home screen.
 
-Il n'achète pas le hors-ligne, et ce n'est pas un oubli. Ces apps lisent leur état d'un backend ;
-un shell en cache sans backend derrière ne peut que dessiner l'erreur qu'il dessine déjà.
+It does not buy offline, and that is not an oversight. These apps read their state from a backend;
+a cached shell with no backend behind it can only draw the error it already draws.
 
-## Ce que l'app doit fournir
+## What the app must provide
 
-Le preset ne génère **pas** de manifeste (`manifest: false`). Le nom, les icônes et le `start_url`
-sont l'identité de l'app, pas celle d'un préréglage — et st0 en porte deux, qu'il échange selon la
-page (`apps/st0/frontend/docs/external.md`). Une app veut donc :
+The preset generates **no** manifest (`manifest: false`). The name, the icons and the `start_url`
+are the app's identity, not a preset's — and st0 carries two, swapped by page
+(`apps/st0/frontend/docs/external.md`). So an app wants:
 
-- `public/manifest.webmanifest`, avec des URLs **relatives** : un manifeste résout ses adresses
-  contre la sienne, pas contre celle du document, donc un `/…` absolu échappe à l'app dès qu'elle
-  est montée sous un préfixe ;
-- des icônes 192 et 512 en PNG, aux dimensions qu'elles déclarent — un navigateur refuse en
-  silence si l'en-tête du fichier ne correspond pas ;
-- `<link rel="manifest">` dans son `index.html` ;
-- l'enregistrement, chez elle :
+- `public/manifest.webmanifest`, with **relative** URLs: a manifest resolves its addresses
+  against its own, not the document's, so an absolute `/…` escapes the app as soon as it is
+  mounted under a prefix;
+- 192 and 512 PNG icons, at the size they declare — a browser silently refuses one whose header
+  does not match;
+- `<link rel="manifest">` in its `index.html`;
+- the registration, in its entry:
 
 ```ts
-if ("serviceWorker" in navigator)
-  void import("virtual:pwa-register").then(({ registerSW }) =>
-    registerSW({ immediate: true }),
-  );
+import { registerWorker } from "@frediverse/vite-config/register";
+
+if ("serviceWorker" in navigator) registerWorker();
 ```
 
-`injectRegister: null` est délibéré : un `<script>` injecté par le plugin poserait cette décision
-hors du fichier qui décide de tout le reste du document.
+`injectRegister: null` is deliberate: a `<script>` injected by the plugin would put that decision
+outside the file that decides everything else about the document.
 
-## Le scope, et pourquoi une seule app a besoin de `pwaDenylist`
+## The scope, and why only one app needs `pwaDenylist`
 
-Le scope d'un worker est le dossier d'où il a été servi, et c'est un **préfixe** : il n'existe
-aucun moyen de dire « tout sauf `/pl8` ».
+A worker's scope is the folder it was served from, and it is a **prefix**: there is no way to say
+"everything but `/pl8`".
 
-Une app montée sous un `base` ne contrôle donc que son propre préfixe, et n'a rien à déclarer.
-Une app servie à la **racine de l'origine** contrôle tout, ses voisines comprises — et si sa
-`navigateFallback` répond à leurs navigations, elles servent son shell : une page blanche avec
-son routeur qui refuse une adresse qu'il ne sait pas lire.
+An app mounted under a `base` therefore controls only its own prefix and has nothing to declare.
+An app served at the **origin's root** controls everything, its neighbours included — and if its
+`navigateFallback` answers their navigations, they serve its shell: a white page with its router
+refusing an address it cannot read.
 
-D'où `pwaDenylist`, que seule l'app racine passe. Dans studio c'est st0 :
+Hence `pwaDenylist`, which only the root app passes. In studio that is st0:
 
 ```ts
 pwaDenylist: [/^\/(pl8|k7|z0|api|auth)(\/|$)/],
 ```
 
-C'est la même table que le `nginx.conf` de l'image. Deux copies du même fait, et celle-ci est
-celle qu'un navigateur applique — **à vérifier en premier** si une app voisine sert un jour le
-shell de l'app racine.
+It is the same table as the image's `nginx.conf`. Two copies of one fact, and this is the one a
+browser enforces — **check it first** if a neighbouring app ever serves the root app's shell.
 
-## `registerType: "prompt"`, et rien n'invite
+## Every deploy reaches every open tab
 
-`autoUpdate` pose `skipWaiting` + `clientsClaim`, donc un nouveau worker prend la main sur un
-onglet déjà ouvert. Deux conséquences, mauvaises toutes les deux : la page peut se recharger au
-milieu de ce qu'on faisait, et surtout un shell du build A continue de tourner alors que le
-précache est celui du build B — le prochain chunk chargé paresseusement est un fichier haché qui
-n'existe plus.
+A tab is left open for days, and a tab still running a bundle from before a protocol change talks to
+a server that no longer answers it the same way. So a new build must replace the old one without
+anyone having to close every tab of the origin — which is the only moment a waiting worker would
+otherwise activate.
 
-`prompt` laisse le nouveau worker **en attente** jusqu'à ce que tous les onglets de l'origine
-soient fermés, le seul moment où l'échange ne coûte rien. Rien n'invite à recharger, faute d'une
-formulation honnête : elle devrait dire « fermez tous les onglets de ce domaine ».
+How it is replaced is what matters. `autoUpdate` sets `skipWaiting` + `clientsClaim`, so a new worker
+takes over a tab that keeps RUNNING the old shell, while the precache is the new build's: the next
+lazily loaded chunk is a hashed file that no longer exists. So the preset keeps
+`registerType: "prompt"` — the new worker waits — and `register.ts` makes the swap whole:
 
-## `clientsClaim` en dev seulement
+- it tells the waiting worker to take over, and **every tab it controlled reloads** onto the new
+  bundle. A reload is the whole page, so no old shell is left asking for chunks;
+- **when**: an update found at startup applies at once, nothing having been done in the tab yet;
+  one found later — a tab asks every half hour, navigations ask on their own — waits until that tab
+  is hidden, so a deploy never reloads a page under someone's hands;
+- any OTHER tab reloads the moment the new worker takes over, visible or not: left running, it
+  would be the old shell over the new precache.
 
-Un navigateur ne propose l'installation qu'une fois qu'un worker **contrôle** la page. Sans
-`clients.claim()`, la première visite en enregistre un qui ne contrôle rien : l'affordance
-n'apparaît qu'à la **deuxième** navigation.
+What a hidden reload costs is the app's in-memory state. An app that holds work only in memory
+must save it before it can afford this.
 
-Sur un poste on recharge machinalement et personne ne le remarque. Sur une tablette, non — et
-c'est l'appareil pour lequel une PWA existe. En dev il n'y a pas d'assets hachés, donc rien à
-désynchroniser : le claim y est gratuit. En build il reste éteint, pour la raison ci-dessus.
+## `clientsClaim` in dev only
 
-`IS_BUILD` se lit sur la ligne de commande parce que `defineAppConfig` rend un objet et n'offre
-pas de `({ command })` à capturer.
+A browser offers installation only once a worker **controls** the page. Without `clients.claim()`,
+the first visit registers one that controls nothing: the affordance appears only at the **second**
+navigation.
+
+On a desktop people reload by reflex and nobody notices. On a tablet they do not — and that is the
+device a PWA exists for. In dev there are no hashed assets, so nothing to desynchronise: the claim
+is free there. In a build it stays off, for the reason above.
+
+`IS_BUILD` is read from the command line because `defineAppConfig` returns an object and offers no
+`({ command })` to capture.
 
 ## `devOptions.enabled: true`
 
-Sinon il n'y a **aucun** worker en dev, et le navigateur ne propose jamais l'installation — alors
-que le manifeste, les icônes et HTTPS sont tous en place, donc tout a l'air prêt. La seule chose
-que ce plugin sert à faire n'était testable que dans un build.
+Otherwise there is **no** worker in dev, and the browser never offers installation — while the
+manifest, the icons and HTTPS are all in place, so everything looks ready. The one thing this
+plugin is for would be testable only in a build.
 
-Le worker de dev ne précache rien (il n'y a pas d'assets hachés avant un build) et Workbox y
-restreint son fallback de navigation à `/` seul, donc les URLs de modules de Vite passent à côté.
+The dev worker precaches nothing (there are no hashed assets before a build) and Workbox restricts
+its navigation fallback to `/` alone there, so Vite's module URLs go past it.
 
-## Quand `pwa: false`
+## When `pwa: false`
 
-Pour une app qui n'est pas un écran : un outil interne servi dans une iframe, une page qu'on ne
-veut pas voir proposée à l'installation. Ce n'est pas le cas courant — le défaut est qu'une app
-du frediverse s'installe.
+For an app that is not a screen: an internal tool served in an iframe, a page that should not be
+offered for installation. It is not the common case — by default a frediverse app installs.
 
-## Le piège qui a coûté le plus de temps
+## Mixed content makes an app uninstallable
 
-Une page HTTPS qui charge la moindre ressource en clair est signalée « inclut des ressources qui
-ne sont pas sécurisées », et **cela suffit à la rendre non installable**. Le certificat peut être
-parfait, le manifeste complet, les icônes valides : rien n'y fait.
+An HTTPS page that loads the smallest resource in the clear is flagged "includes resources that are
+not secure", and **that alone makes it uninstallable**. The certificate can be perfect, the manifest
+complete, the icons valid: nothing helps.
 
-Chercher côté certificat est le réflexe, et c'est une impasse. Le panneau d'informations du site
-distingue les deux : un problème de certificat le dit ; du contenu mixte dit « ressources non
-sécurisées ». Lire cette ligne d'abord épargne une heure.
+Looking at the certificate is the reflex, and it is a dead end. The site information panel tells
+the two apart: a certificate problem says so; mixed content says "resources that are not secure".
+Read that line first.

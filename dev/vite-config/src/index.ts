@@ -202,9 +202,9 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
         ? []
         : [
             VitePWA({
-              // No forced reload, ever: the worker waits until every tab of this origin is
-              // closed. `autoUpdate` would swap a running app's bundle out from under it, and
-              // the shell left behind then asks for chunks the new precache no longer has.
+              // A new worker WAITS; `./register` tells it to take over and reloads every tab onto
+              // it. `autoUpdate` would swap the precache under a running shell, whose next lazy
+              // chunk then no longer exists (docs/pwa.md).
               registerType: "prompt",
               // The app owns its `public/manifest.webmanifest`: name, icons and start_url are
               // its identity, not a preset's. st0 ships TWO and swaps between them.
