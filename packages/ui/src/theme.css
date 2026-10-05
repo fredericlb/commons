@@ -33,7 +33,7 @@
   --sh-radius: 10px;
 }
 
-/* Frediverse type: Bitcount Ink for titles and headings (--font-brand), Sansation
+/* Frediverse type: Rubik 80s Fade for titles and headings (--font-brand), Sansation
    for everything else (--font-sans, --font-display; 300, 400, 700). Both come
    from Google Fonts, linked by @frediverse/vite-config's defineAppConfig.
    An app with its own identity (acu's Noto/CJK, z0's Press Start 2P)
@@ -46,26 +46,16 @@
   --font-sans: "Sansation", system-ui, sans-serif;
   --font-display: "Sansation", system-ui, sans-serif;
   /* Titles and headings — the app name in AppHeader, every h1–h6, CardTitle:
-     Bitcount Ink, a colour (COLRv1) pixel face. Without its link the headings
-     fall back to the body face. Never for body copy. */
-  --font-brand: "Bitcount Ink", "Sansation", system-ui, sans-serif;
-}
-
-/* Bitcount Ink paints itself in colour; this palette turns all 29 of its CPAL
-   entries white. Set on :root below and inherited, so every title, heading and
-   CardTitle is white; it names Bitcount Ink, so no other face is touched. */
-@font-palette-values --brand-white {
-  font-family: "Bitcount Ink";
-  override-colors:
-    0 #fff, 1 #fff, 2 #fff, 3 #fff, 4 #fff, 5 #fff, 6 #fff, 7 #fff, 8 #fff,
-    9 #fff, 10 #fff, 11 #fff, 12 #fff, 13 #fff, 14 #fff, 15 #fff, 16 #fff,
-    17 #fff, 18 #fff, 19 #fff, 20 #fff, 21 #fff, 22 #fff, 23 #fff, 24 #fff,
-    25 #fff, 26 #fff, 27 #fff, 28 #fff;
+     Rubik 80s Fade, in white. Without its link the headings fall back to the
+     body face. Never for body copy. */
+  --font-brand: "Rubik 80s Fade", "Sansation", system-ui, sans-serif;
 }
 
 @layer base {
+  /* Rubik 80s Fade has one weight, and a faked bold fills its fade stripes in;
+     Sansation has a real 700, so nothing else ever needed the fake. */
   :root {
-    font-palette: --brand-white;
+    font-synthesis-weight: none;
   }
 
   h1,
@@ -75,6 +65,7 @@
   h5,
   h6 {
     font-family: var(--font-brand);
+    color: #fff;
   }
 }
 

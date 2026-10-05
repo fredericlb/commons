@@ -15,10 +15,11 @@ without each of them re-deciding it.
 - `variant="accent"` — solid primary, white text; `variant="plain"` — card
   background. Both kept for an app with a reason; none has one today.
 
-The **name** is set in the brand face, `font-brand` — Bitcount Ink, a colour
-(COLRv1) pixel font from Google Fonts. The same face sets every heading
-(`h1`–`h6`, through `theme.css`'s base layer) and `CardTitle`. Its own colours
-are replaced by white everywhere: `theme.css` sets a white `font-palette` on
+The **name** is set in the brand face, `font-brand` — Rubik 80s Fade, a
+striped display font from Google Fonts, always in white. The same face sets
+every heading (`h1`–`h6`, through `theme.css`'s base layer) and `CardTitle`.
+It has a single weight, and a browser-faked bold fills its stripes in, so
+`theme.css` turns weight synthesis off (`font-synthesis-weight: none`) on
 `:root`. The token lives in `theme.css` with Sansation as fallback; the
 stylesheet link is injected into every app's page by `@frediverse/vite-config`
 (`defineAppConfig`), so an app links nothing itself. It is for titles and
