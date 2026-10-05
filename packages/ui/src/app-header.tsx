@@ -4,7 +4,7 @@ import { HamburgerMenu, type HamburgerMenuItem } from "./hamburger-menu";
 import { cn } from "./lib/utils";
 
 // The app bar every frediverse SPA shares: the app NAME on the left in the
-// brand face (Nabla), its top-level entries on the right — inline buttons from
+// brand face (Bitcount Ink), its top-level entries on the right — inline buttons from
 // `sm` up, collapsed into a hamburger menu below. The house look is `tint`:
 // the accent at 20 % over the page. `accent` (solid primary) and `plain` (card)
 // remain for an app that has a reason. See docs/app-header.md.
@@ -91,7 +91,7 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
           )}
         >
           <div className="flex min-w-0 items-baseline gap-3">
-            {/* The name in the brand face. Nabla is a colour font and paints
+            {/* The name in the brand face. Bitcount Ink is a colour font and paints
                 itself; the size is generous because it is built for it. */}
             <span
               className="truncate font-brand text-xl leading-none"

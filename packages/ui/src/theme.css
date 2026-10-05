@@ -45,10 +45,22 @@
 @theme static {
   --font-sans: "Palanquin", system-ui, sans-serif;
   --font-display: "Faster One", "Palanquin", system-ui, sans-serif;
-  /* The app NAME, as AppHeader sets it: Nabla, a colour (COLRv1) display face
-     from Google Fonts — link `family=Nabla` in the app's index.html, or the
-     name falls back to the display face above. Never for anything but a name. */
-  --font-brand: "Nabla", "Faster One", "Palanquin", system-ui, sans-serif;
+  /* Titles and headings — the app name in AppHeader, every h1–h6, CardTitle:
+     Bitcount Ink, a colour (COLRv1) pixel face from Google Fonts. The link is
+     injected by @frediverse/vite-config's defineAppConfig; without it the
+     headings fall back to the body face. Never for body copy. */
+  --font-brand: "Bitcount Ink", "Palanquin", system-ui, sans-serif;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-brand);
+  }
 }
 
 @theme inline {

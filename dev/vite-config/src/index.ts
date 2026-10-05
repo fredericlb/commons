@@ -125,6 +125,35 @@ function bareBaseRedirect(prefix: string): Plugin {
   };
 }
 
+/** The house heading face, Bitcount Ink (`--font-brand` in @frediverse/ui's theme.css): linked in every app's page from here. */
+export const BRAND_FONTS_URL =
+  "https://fonts.googleapis.com/css2?family=Bitcount+Ink:wght@100..900&display=swap";
+
+const brandFonts: Plugin = {
+  name: "commons:brand-fonts",
+  transformIndexHtml: () => [
+    {
+      tag: "link",
+      attrs: { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      injectTo: "head",
+    },
+    {
+      tag: "link",
+      attrs: {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossorigin: "",
+      },
+      injectTo: "head",
+    },
+    {
+      tag: "link",
+      attrs: { rel: "stylesheet", href: BRAND_FONTS_URL },
+      injectTo: "head",
+    },
+  ],
+};
+
 export function defineAppConfig(options: AppConfigOptions): UserConfig {
   const dir = options.dir.startsWith("file:")
     ? path.dirname(fileURLToPath(options.dir))
@@ -197,6 +226,7 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
       ...(prefix ? [bareBaseRedirect(prefix)] : []),
       react(),
       tailwindcss(),
+      brandFonts,
       upgradeSocketGuard,
       ...(options.pwa === false
         ? []

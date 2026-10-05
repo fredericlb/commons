@@ -15,11 +15,13 @@ without each of them re-deciding it.
 - `variant="accent"` — solid primary, white text; `variant="plain"` — card
   background. Both kept for an app with a reason; none has one today.
 
-The **name** is set in the brand face, `font-brand` — Nabla, a colour
-(COLRv1) display font from Google Fonts. The token lives in `theme.css` with
-Faster One and Palanquin as fallbacks, so an app that has not linked
-`family=Nabla` in its `index.html` still gets a name, just not the coloured
-one. It is for the name and nothing else: a colour font at body size is noise.
+The **name** is set in the brand face, `font-brand` — Bitcount Ink, a colour
+(COLRv1) pixel font from Google Fonts. The same face sets every heading
+(`h1`–`h6`, through `theme.css`'s base layer) and `CardTitle`. The token lives
+in `theme.css` with Palanquin as fallback; the stylesheet link is injected into
+every app's page by `@frediverse/vite-config` (`defineAppConfig`), so an app
+links nothing itself. It is for titles and nothing else: a colour font at body
+size is noise.
 
 `contained` caps and centres the bar's content at `max-w-3xl`, for an app whose
 page is a centred column and wants the bar aligned with it. The phare apps
