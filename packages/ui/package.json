@@ -39,6 +39,7 @@
     "./tabs": "./src/tabs.tsx",
     "./timeline": "./src/timeline.tsx",
     "./tooltip": "./src/tooltip.tsx",
+    "./user-menu": "./src/user-menu.tsx",
     "./calendar": "./src/calendar.tsx",
     "./dialog": "./src/dialog.tsx",
     "./dropdown-menu": "./src/dropdown-menu.tsx",

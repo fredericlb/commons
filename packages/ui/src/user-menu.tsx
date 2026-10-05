@@ -1,0 +1,105 @@
+// user-menu.tsx — the top-right menu of an app: who is signed in, links to the host's other
+// apps (each in a NEW tab), and the logout. It fetches nothing and ends no session itself: the
+// email and the logout are the host's, since only the host knows where its /auth answers and
+// where to land afterwards. See ../docs/user-menu.md.
+
+import { Button } from "./button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
+import { CircleUser, LogOut, type LucideIcon } from "./icons";
+
+export interface UserMenuLink {
+  /** A stable key for the row. */
+  id: string;
+  label: string;
+  /** One line under the label. */
+  hint?: string;
+  icon?: LucideIcon;
+  href: string;
+}
+
+export interface UserMenuProps {
+  /** Who is signed in, as the menu's heading; null while it is not known yet. */
+  email?: string | null;
+  /** Ends the session — the host's call, as is where to land afterwards. */
+  onLogout: () => void;
+  /** Other applications, each opened in a new tab. */
+  links?: UserMenuLink[];
+  /** Said in place of the links when there is nowhere to go. */
+  notice?: string;
+  /** The trigger's accessible name. */
+  label?: string;
+  logoutLabel?: string;
+}
+
+export function UserMenu({
+  email,
+  onLogout,
+  links = [],
+  notice,
+  label = "Account",
+  logoutLabel = "Sign out",
+}: UserMenuProps) {
+  const hasMiddle = notice !== undefined || links.length > 0;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={label}
+          title={email || label}
+        >
+          <CircleUser className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel className="truncate font-normal text-muted-foreground">
+          {email || "…"}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {notice !== undefined ? (
+          <DropdownMenuItem disabled className="text-xs">
+            {notice}
+          </DropdownMenuItem>
+        ) : (
+          links.map((link) => {
+            const Icon = link.icon;
+            return (
+              // asChild so the row IS the anchor, and ctrl-click and middle-click mean what they say.
+              <DropdownMenuItem
+                key={link.id}
+                asChild
+                className="items-start gap-2"
+              >
+                {/* Another APPLICATION: leaving this one would lose what it holds. */}
+                <a href={link.href} target="_blank" rel="noopener">
+                  {Icon ? <Icon className="mt-0.5 h-4 w-4 shrink-0" /> : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{link.label}</span>
+                    {link.hint ? (
+                      <span className="block text-xs text-muted-foreground">
+                        {link.hint}
+                      </span>
+                    ) : null}
+                  </span>
+                </a>
+              </DropdownMenuItem>
+            );
+          })
+        )}
+        {hasMiddle ? <DropdownMenuSeparator /> : null}
+        <DropdownMenuItem className="gap-2" onSelect={onLogout}>
+          <LogOut className="h-4 w-4" />
+          {logoutLabel}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
