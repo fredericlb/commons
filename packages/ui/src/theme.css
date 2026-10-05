@@ -33,8 +33,8 @@
   --sh-radius: 10px;
 }
 
-/* Frediverse type: Bitcount Ink for titles and headings (--font-brand), Aldrich
-   for everything else (--font-sans, --font-display; one weight, 400). Both come
+/* Frediverse type: Bitcount Ink for titles and headings (--font-brand), Sansation
+   for everything else (--font-sans, --font-display; 300, 400, 700). Both come
    from Google Fonts, linked by @frediverse/vite-config's defineAppConfig.
    An app with its own identity (acu's Noto/CJK, z0's Press Start 2P)
    overrides these in its own stylesheet. */
@@ -43,12 +43,12 @@
    stylesheets reference it as plain `var(--font-display)`, which the shaker
    can't see. */
 @theme static {
-  --font-sans: "Aldrich", system-ui, sans-serif;
-  --font-display: "Aldrich", system-ui, sans-serif;
+  --font-sans: "Sansation", system-ui, sans-serif;
+  --font-display: "Sansation", system-ui, sans-serif;
   /* Titles and headings — the app name in AppHeader, every h1–h6, CardTitle:
      Bitcount Ink, a colour (COLRv1) pixel face. Without its link the headings
      fall back to the body face. Never for body copy. */
-  --font-brand: "Bitcount Ink", "Aldrich", system-ui, sans-serif;
+  --font-brand: "Bitcount Ink", "Sansation", system-ui, sans-serif;
 }
 
 /* Bitcount Ink paints itself in colour; this palette turns all 29 of its CPAL
