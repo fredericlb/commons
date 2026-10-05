@@ -1,8 +1,8 @@
 import * as React from "react";
 import { cn } from "./lib/utils";
 
-// Mirrors the legacy .card block: surface panel with border, 12px radius,
-// 18px padding and vertical rhythm.
+// A surface panel: border, 12px radius, 18px padding. No outer margin — spacing between cards is
+// the parent's (a `gap`, a `space-y-*`), so a card drops into a grid or a flex row as it is.
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -10,7 +10,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "my-4 rounded-xl border border-border bg-card p-[18px] text-card-foreground",
+      "rounded-xl border border-border bg-card p-[18px] text-card-foreground",
       className,
     )}
     {...props}
