@@ -35,7 +35,7 @@ export function SignInScreen({
     <div className="flex min-h-screen flex-col items-center px-4 py-8">
       <Starfield />
       {wordmark ? (
-        <p className="relative pt-4 text-center font-brand text-4xl font-medium tracking-wide font-palette-white sm:pt-8 sm:text-6xl">
+        <p className="relative pt-4 text-center font-brand text-4xl font-medium tracking-wide text-white sm:pt-8 sm:text-6xl">
           frediverse
         </p>
       ) : null}

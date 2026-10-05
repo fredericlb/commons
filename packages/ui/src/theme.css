@@ -52,7 +52,8 @@
 }
 
 /* Bitcount Ink paints itself in colour; this palette turns all 29 of its CPAL
-   entries white, for a wordmark over the starfield (`font-palette-white`). */
+   entries white. Set on :root below and inherited, so every title, heading and
+   CardTitle is white; it names Bitcount Ink, so no other face is touched. */
 @font-palette-values --brand-white {
   font-family: "Bitcount Ink";
   override-colors:
@@ -62,12 +63,11 @@
     25 #fff, 26 #fff, 27 #fff, 28 #fff;
 }
 
-@utility font-palette-white {
-  font-palette: --brand-white;
-  color: #fff;
-}
-
 @layer base {
+  :root {
+    font-palette: --brand-white;
+  }
+
   h1,
   h2,
   h3,

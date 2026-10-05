@@ -17,11 +17,12 @@ without each of them re-deciding it.
 
 The **name** is set in the brand face, `font-brand` — Bitcount Ink, a colour
 (COLRv1) pixel font from Google Fonts. The same face sets every heading
-(`h1`–`h6`, through `theme.css`'s base layer) and `CardTitle`. The token lives
-in `theme.css` with Palanquin as fallback; the stylesheet link is injected into
-every app's page by `@frediverse/vite-config` (`defineAppConfig`), so an app
-links nothing itself. It is for titles and nothing else: a colour font at body
-size is noise.
+(`h1`–`h6`, through `theme.css`'s base layer) and `CardTitle`. Its own colours
+are replaced by white everywhere: `theme.css` sets a white `font-palette` on
+`:root`. The token lives in `theme.css` with Sansation as fallback; the
+stylesheet link is injected into every app's page by `@frediverse/vite-config`
+(`defineAppConfig`), so an app links nothing itself. It is for titles and
+nothing else.
 
 `contained` caps and centres the bar's content at `max-w-3xl`, for an app whose
 page is a centred column and wants the bar aligned with it. The phare apps
