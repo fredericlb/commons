@@ -45,9 +45,9 @@
 @theme static {
   --font-sans: "Sansation", system-ui, sans-serif;
   --font-display: "Sansation", system-ui, sans-serif;
-  /* Titles — the app name in AppHeader, CardTitle, the sign-in wordmark:
-     Rubik 80s Fade, in white. h1–h6 stay in the body face. Without its link
-     the titles fall back to the body face. Never for body copy. */
+  /* Titles — the app name in AppHeader and the sign-in wordmark: Rubik 80s
+     Fade, in white. h1–h6 and CardTitle stay in the body face. Without its
+     link the titles fall back to the body face. Never for body copy. */
   --font-brand: "Rubik 80s Fade", "Sansation", system-ui, sans-serif;
 }
 
