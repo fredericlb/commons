@@ -38,6 +38,7 @@ behind the bar.
 | `description` | one line under it |
 | `children` | the action: a button, a form, a retry |
 | `footer` | under the card, over the stars, in light text: a language picker |
+| `wordmark` | "frediverse" across the top in white brand type (the `font-palette-white` utility) — for a screen about the network itself, like registration |
 | `className` | on the card: `text-center`, a wider `max-w-lg` |
 
 The card stays the regular `Card`, light or dark with the theme. The stars

@@ -17,6 +17,8 @@ export interface SignInScreenProps {
   children?: ReactNode;
   /** Below the card, over the stars: a language picker, a version. */
   footer?: ReactNode;
+  /** "frediverse" across the top of the page, in white brand type — for a screen about the network itself. */
+  wordmark?: boolean;
   /** Applied to the card, e.g. `text-center` or a wider `max-w-lg`. */
   className?: string;
 }
@@ -26,21 +28,29 @@ export function SignInScreen({
   description,
   children,
   footer,
+  wordmark = false,
   className,
 }: SignInScreenProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 py-8">
+    <div className="flex min-h-screen flex-col items-center px-4 py-8">
       <Starfield />
-      <Card className={cn("relative w-full max-w-md", className)}>
-        <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
-          {description ? (
-            <CardDescription>{description}</CardDescription>
-          ) : null}
-        </CardHeader>
-        {children}
-      </Card>
-      {footer ? <div className="relative text-white/80">{footer}</div> : null}
+      {wordmark ? (
+        <p className="relative pt-4 text-center font-brand text-4xl font-medium tracking-wide font-palette-white sm:pt-8 sm:text-6xl">
+          frediverse
+        </p>
+      ) : null}
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 py-8">
+        <Card className={cn("relative w-full max-w-md", className)}>
+          <CardHeader>
+            <CardTitle className="text-lg">{title}</CardTitle>
+            {description ? (
+              <CardDescription>{description}</CardDescription>
+            ) : null}
+          </CardHeader>
+          {children}
+        </Card>
+        {footer ? <div className="relative text-white/80">{footer}</div> : null}
+      </div>
     </div>
   );
 }

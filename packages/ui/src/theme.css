@@ -52,6 +52,22 @@
   --font-brand: "Bitcount Ink", "Palanquin", system-ui, sans-serif;
 }
 
+/* Bitcount Ink paints itself in colour; this palette turns all 29 of its CPAL
+   entries white, for a wordmark over the starfield (`font-palette-white`). */
+@font-palette-values --brand-white {
+  font-family: "Bitcount Ink";
+  override-colors:
+    0 #fff, 1 #fff, 2 #fff, 3 #fff, 4 #fff, 5 #fff, 6 #fff, 7 #fff, 8 #fff,
+    9 #fff, 10 #fff, 11 #fff, 12 #fff, 13 #fff, 14 #fff, 15 #fff, 16 #fff,
+    17 #fff, 18 #fff, 19 #fff, 20 #fff, 21 #fff, 22 #fff, 23 #fff, 24 #fff,
+    25 #fff, 26 #fff, 27 #fff, 28 #fff;
+}
+
+@utility font-palette-white {
+  font-palette: --brand-white;
+  color: #fff;
+}
+
 @layer base {
   h1,
   h2,

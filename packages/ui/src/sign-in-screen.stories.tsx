@@ -45,3 +45,8 @@ export const WithLocalePicker: Story = {
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: "mobile1" } },
 };
+
+/** "frediverse" across the top, white — the registration screen. */
+export const WithWordmark: Story = {
+  args: { wordmark: true, title: "Create your account" },
+};
