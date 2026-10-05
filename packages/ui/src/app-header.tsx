@@ -15,8 +15,10 @@ export interface AppHeaderProps
   extends Omit<React.HTMLAttributes<HTMLElement>, "title"> {
   /** App name, left side. A link is fine — it renders as given. */
   title: React.ReactNode;
-  /** Optional status line next to the title (e.g. a count, a build stamp). */
+  /** Optional status line next to the title (e.g. a count). */
   subtitle?: React.ReactNode;
+  /** Build stamp, shown only as a tooltip on hovering the name. */
+  version?: string;
   /** Top-level entries — buttons on desktop, menu items behind the hamburger on mobile. */
   items?: AppHeaderItem[];
   /**
@@ -64,6 +66,7 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
     {
       title,
       subtitle,
+      version,
       items = [],
       actions,
       variant = "tint",
@@ -90,7 +93,10 @@ const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
           <div className="flex min-w-0 items-baseline gap-3">
             {/* The name in the brand face. Nabla is a colour font and paints
                 itself; the size is generous because it is built for it. */}
-            <span className="truncate font-brand text-xl leading-none">
+            <span
+              className="truncate font-brand text-xl leading-none"
+              title={version}
+            >
               {title}
             </span>
             {subtitle ? (

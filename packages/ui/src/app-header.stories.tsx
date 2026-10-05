@@ -64,7 +64,7 @@ export const Plain: Story = {
     variant: "plain",
     contained: true,
     title: "routine",
-    subtitle: "26.0815",
+    version: "26.0815",
     items: [
       { label: "Todos", icon: "✅", onClick: () => {} },
       { label: "Budget", icon: "💰", onClick: () => {}, active: true },
@@ -91,7 +91,7 @@ export const PlainMobile: Story = {
 export const WithActions: Story = {
   args: {
     title: "🔐 calepin",
-    subtitle: "dev",
+    version: "dev",
     items: [
       {
         label: "Partages",

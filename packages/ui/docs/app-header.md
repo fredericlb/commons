@@ -45,7 +45,8 @@ the bar; an app with a different page colour gets a tab that does not join it.
 | prop | what it is | on a phone |
 | --- | --- | --- |
 | `title` | the app's name; a `<Link>` is fine | always shown |
-| `subtitle` | a status or a build stamp beside the name | hidden under 420 px |
+| `subtitle` | a status beside the name (a count…) | hidden under 420 px |
+| `version` | the build stamp — a tooltip on the name, never drawn | n/a (no hover) |
 | `items` | the **pages / top-level actions** | behind the hamburger |
 | `actions` | controls that must stay reachable — lock, locale, "new…" | inline, after the hamburger |
 | `children` | anything else, between the title and the entries | as given |
