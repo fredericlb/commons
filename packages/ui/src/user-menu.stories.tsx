@@ -40,3 +40,6 @@ export const NoLinks: Story = { args: { links: [] } };
 export const Notice: Story = {
   args: { notice: "Pair this app with a server to reach the others." },
 };
+
+/** The app's settings, as the row right under the email. */
+export const WithSettings: Story = { args: { onSettings: () => {} } };

@@ -1,8 +1,8 @@
 # `UserMenu` — the account, the other apps, the logout
 
 `@frediverse/ui/user-menu` is the button at the far right of an app's header: a menu headed by
-the signed-in account's email, then one row per OTHER application the host wants to offer, then
-the logout.
+the signed-in account's email, then the app's own settings when the host has some, then one row
+per OTHER application the host wants to offer, then the logout.
 
 ```tsx
 <AppHeader
@@ -41,6 +41,14 @@ the same way, which is to say wrongly.
 
 `rel="noopener"` severs `window.opener`: nothing here reaches back into the tab it came from.
 
+## Settings, under the email
+
+`onSettings` adds one row right under the email, and it is a callback rather than a link because
+settings are a page of THIS app: the host navigates the way it navigates — a router, a section
+switch — and stays in the tab. They sit with the account because they are what a person sets once
+and leaves, which is what the rest of this menu is too; a header button for them is a button paid
+for on every screen.
+
 ## `notice`, the day there is nowhere to go
 
 A host that knows its links would all fail — a desktop app paired with no server — passes
@@ -53,6 +61,7 @@ and the logout stay. A menu of links at a 503 would be as many ways to find that
 | --- | --- |
 | `email` | the menu's heading; `null` while not known yet |
 | `onLogout` | ends the session |
+| `onSettings` | opens the app's settings, as the row under the email |
 | `links` | `{ id, label, hint?, icon?, href }[]`, each opened in a new tab |
 | `notice` | said in place of the links |
-| `label`, `logoutLabel` | the trigger's name and the logout row's, English by default |
+| `label`, `settingsLabel`, `logoutLabel` | the trigger's name and the two rows', English by default |

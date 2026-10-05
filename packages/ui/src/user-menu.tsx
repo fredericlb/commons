@@ -1,5 +1,5 @@
-// user-menu.tsx — the top-right menu of an app: who is signed in, links to the host's other
-// apps (each in a NEW tab), and the logout. It fetches nothing and ends no session itself: the
+// user-menu.tsx — the top-right menu of an app: who is signed in, the app's settings, links to
+// the host's other apps (each in a NEW tab), and the logout. It fetches nothing and ends no session itself: the
 // email and the logout are the host's, since only the host knows where its /auth answers and
 // where to land afterwards. See ../docs/user-menu.md.
 
@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { CircleUser, LogOut, type LucideIcon } from "./icons";
+import { CircleUser, LogOut, type LucideIcon, Settings } from "./icons";
 
 export interface UserMenuLink {
   /** A stable key for the row. */
@@ -29,21 +29,26 @@ export interface UserMenuProps {
   email?: string | null;
   /** Ends the session — the host's call, as is where to land afterwards. */
   onLogout: () => void;
+  /** Opens this app's settings, as the row right under the email; no row without it. */
+  onSettings?: () => void;
   /** Other applications, each opened in a new tab. */
   links?: UserMenuLink[];
   /** Said in place of the links when there is nowhere to go. */
   notice?: string;
   /** The trigger's accessible name. */
   label?: string;
+  settingsLabel?: string;
   logoutLabel?: string;
 }
 
 export function UserMenu({
   email,
   onLogout,
+  onSettings,
   links = [],
   notice,
   label = "Account",
+  settingsLabel = "Settings",
   logoutLabel = "Sign out",
 }: UserMenuProps) {
   const hasMiddle = notice !== undefined || links.length > 0;
@@ -64,6 +69,15 @@ export function UserMenu({
           {email || "…"}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {onSettings ? (
+          <>
+            <DropdownMenuItem className="gap-2" onSelect={onSettings}>
+              <Settings className="h-4 w-4" />
+              {settingsLabel}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         {notice !== undefined ? (
           <DropdownMenuItem disabled className="text-xs">
             {notice}
