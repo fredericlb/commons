@@ -125,9 +125,9 @@ function bareBaseRedirect(prefix: string): Plugin {
   };
 }
 
-/** The house heading face, Bitcount Ink (`--font-brand` in @frediverse/ui's theme.css): linked in every app's page from here. */
+/** The house faces, linked in every app's page from here: Bitcount Ink for headings, Aldrich for the rest (@frediverse/ui's theme.css). */
 export const BRAND_FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Bitcount+Ink:wght@100..900&display=swap";
+  "https://fonts.googleapis.com/css2?family=Aldrich&family=Bitcount+Ink:wght@100..900&display=swap";
 
 const brandFonts: Plugin = {
   name: "commons:brand-fonts",

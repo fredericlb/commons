@@ -33,9 +33,9 @@
   --sh-radius: 10px;
 }
 
-/* Frediverse type. Faster One is the app-title face (display only, 400 weight —
-   never use it below ~24px or for body copy); Palanquin is the body face. Both
-   come from Google Fonts and must be linked in the consuming app's index.html.
+/* Frediverse type: Bitcount Ink for titles and headings (--font-brand), Aldrich
+   for everything else (--font-sans, --font-display; one weight, 400). Both come
+   from Google Fonts, linked by @frediverse/vite-config's defineAppConfig.
    An app with its own identity (acu's Noto/CJK, z0's Press Start 2P)
    overrides these in its own stylesheet. */
 /* `static` so both vars are always emitted: Tailwind tree-shakes unused theme
@@ -43,13 +43,12 @@
    stylesheets reference it as plain `var(--font-display)`, which the shaker
    can't see. */
 @theme static {
-  --font-sans: "Palanquin", system-ui, sans-serif;
-  --font-display: "Faster One", "Palanquin", system-ui, sans-serif;
+  --font-sans: "Aldrich", system-ui, sans-serif;
+  --font-display: "Aldrich", system-ui, sans-serif;
   /* Titles and headings — the app name in AppHeader, every h1–h6, CardTitle:
-     Bitcount Ink, a colour (COLRv1) pixel face from Google Fonts. The link is
-     injected by @frediverse/vite-config's defineAppConfig; without it the
-     headings fall back to the body face. Never for body copy. */
-  --font-brand: "Bitcount Ink", "Palanquin", system-ui, sans-serif;
+     Bitcount Ink, a colour (COLRv1) pixel face. Without its link the headings
+     fall back to the body face. Never for body copy. */
+  --font-brand: "Bitcount Ink", "Aldrich", system-ui, sans-serif;
 }
 
 /* Bitcount Ink paints itself in colour; this palette turns all 29 of its CPAL
