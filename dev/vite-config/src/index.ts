@@ -125,7 +125,7 @@ function bareBaseRedirect(prefix: string): Plugin {
   };
 }
 
-/** The house faces, linked in every app's page from here: Rubik 80s Fade for headings, Sansation for the rest (@frediverse/ui's theme.css). */
+/** The house faces, linked in every app's page from here: Rubik 80s Fade for titles, Sansation for the rest (@frediverse/ui's theme.css). */
 export const BRAND_FONTS_URL =
   "https://fonts.googleapis.com/css2?family=Sansation:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Rubik+80s+Fade&display=swap";
 

@@ -33,7 +33,7 @@
   --sh-radius: 10px;
 }
 
-/* Frediverse type: Rubik 80s Fade for titles and headings (--font-brand), Sansation
+/* Frediverse type: Rubik 80s Fade for titles (--font-brand), Sansation
    for everything else (--font-sans, --font-display; 300, 400, 700). Both come
    from Google Fonts, linked by @frediverse/vite-config's defineAppConfig.
    An app with its own identity (acu's Noto/CJK, z0's Press Start 2P)
@@ -45,9 +45,9 @@
 @theme static {
   --font-sans: "Sansation", system-ui, sans-serif;
   --font-display: "Sansation", system-ui, sans-serif;
-  /* Titles and headings — the app name in AppHeader, every h1–h6, CardTitle:
-     Rubik 80s Fade, in white. Without its link the headings fall back to the
-     body face. Never for body copy. */
+  /* Titles — the app name in AppHeader, CardTitle, the sign-in wordmark:
+     Rubik 80s Fade, in white. h1–h6 stay in the body face. Without its link
+     the titles fall back to the body face. Never for body copy. */
   --font-brand: "Rubik 80s Fade", "Sansation", system-ui, sans-serif;
 }
 
@@ -56,16 +56,6 @@
      Sansation has a real 700, so nothing else ever needed the fake. */
   :root {
     font-synthesis-weight: none;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: var(--font-brand);
-    color: #fff;
   }
 }
 

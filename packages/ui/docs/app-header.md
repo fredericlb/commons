@@ -17,8 +17,8 @@ without each of them re-deciding it.
 
 The **name** is set in the brand face, `font-brand` — Rubik 80s Fade, a
 striped display font from Google Fonts, always in white. The same face sets
-every heading (`h1`–`h6`, through `theme.css`'s base layer) and `CardTitle`.
-It has a single weight, and a browser-faked bold fills its stripes in, so
+`CardTitle` and the sign-in wordmark; plain headings (`h1`–`h6`) stay in the
+body face, Sansation. It has a single weight, and a browser-faked bold fills its stripes in, so
 `theme.css` turns weight synthesis off (`font-synthesis-weight: none`) on
 `:root`. The token lives in `theme.css` with Sansation as fallback; the
 stylesheet link is injected into every app's page by `@frediverse/vite-config`
