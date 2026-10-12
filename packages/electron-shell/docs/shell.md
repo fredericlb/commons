@@ -5,7 +5,7 @@ unchanged, behind one window. It holds nothing about any one app: what is an app
 
 | subpath | what it holds |
 |---|---|
-| `servers` | a server started under tsx with Electron as its node, waited for, stopped |
+| `servers` | a server started with Electron as its node — under tsx, or bundled — waited for, stopped |
 | `guard` | the entry that leads each server's process group — built beside the main process |
 | `log` | one merged log, every line prefixed by who said it |
 | `boot` | the ports checked free, the session secret kept across launches |
@@ -15,9 +15,10 @@ unchanged, behind one window. It holds nothing about any one app: what is an app
 
 ## The servers run unchanged
 
-**Under tsx, as children — the way their Docker images run them.** Nothing is bundled, so the
-packaged app carries source plus `node_modules`, and a server behaves exactly as it does in
-production. The cost is size and that tsx compiles on every start.
+**Under tsx, as children — the way their Docker images run them** — or, when the app hands a
+bundle and no `tsx`, that bundle run by node as it is. Under tsx the packaged app carries source
+plus `node_modules` and a server behaves exactly as in production, at the cost of size and a
+compile on every start; a bundle is the app's choice when that cost matters.
 
 **Electron is their node**, through `ELECTRON_RUN_AS_NODE=1`. It is inherited, and that is
 load-bearing: a server that spawns with `process.execPath` gets Electron, and only that variable

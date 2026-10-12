@@ -1,4 +1,4 @@
-// servers.ts — an app's Node servers, run unchanged as children under tsx with Electron as their node.
+// servers.ts — an app's Node servers, run as children with Electron as their node: under tsx, or a bundle on its own.
 // Each runs under guard.ts, which leads its process group and stops it when the pipe from this process closes — on a crash too.
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
@@ -16,12 +16,12 @@ export interface ServerSpec {
   /** The prefix of its lines in the merged log. */
   name: string;
   port: number;
-  /** The server's TypeScript entry, run by tsx. */
+  /** The server's entry: TypeScript run by tsx, or with no `tsx` a bundle node runs as it is. */
   entry: string;
-  /** tsx's cli.mjs. */
-  tsx: string;
+  /** tsx's cli.mjs; absent for a bundled entry. */
+  tsx?: string;
   /** The server's own tsconfig, which tsx would not find from `cwd`. */
-  tsconfig: string;
+  tsconfig?: string;
   /** Laid over this process's environment. */
   env: Record<string, string>;
   /** Variables of this process's environment the server must not inherit. */
@@ -45,11 +45,12 @@ export function startServer(spec: ServerSpec): Server {
     // Electron as plain node, inherited by whatever the server spawns with `process.execPath`.
     ELECTRON_RUN_AS_NODE: "1",
     PORT: String(spec.port),
-    TSX_TSCONFIG_PATH: spec.tsconfig,
+    ...(spec.tsconfig ? { TSX_TSCONFIG_PATH: spec.tsconfig } : {}),
   };
   for (const name of ["NODE_OPTIONS", ...(spec.unset ?? [])]) delete env[name];
   mkdirSync(spec.cwd, { recursive: true });
-  const child = spawn(process.execPath, [guardScript(), spec.tsx, spec.entry], {
+  const run = spec.tsx ? [spec.tsx, spec.entry] : [spec.entry];
+  const child = spawn(process.execPath, [guardScript(), ...run], {
     cwd: spec.cwd,
     env,
     // stdin is the guard's lifeline: never written, and closed by the OS however this process ends.
