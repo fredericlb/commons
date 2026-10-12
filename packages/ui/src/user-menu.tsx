@@ -24,6 +24,14 @@ export interface UserMenuLink {
   href: string;
 }
 
+/** A row of the host's own, drawn with Settings: a page of this app the person reaches from the menu. */
+export interface UserMenuItem {
+  id: string;
+  label: string;
+  icon?: LucideIcon;
+  onSelect: () => void;
+}
+
 export interface UserMenuProps {
   /** Who is signed in, as the menu's heading; null while it is not known yet. */
   email?: string | null;
@@ -31,6 +39,8 @@ export interface UserMenuProps {
   onLogout: () => void;
   /** Opens this app's settings, as the row right under the email; no row without it. */
   onSettings?: () => void;
+  /** More of this app's pages, as rows under Settings, in the same group. */
+  items?: UserMenuItem[];
   /** Other applications, each opened in a new tab. */
   links?: UserMenuLink[];
   /** Said in place of the links when there is nowhere to go. */
@@ -45,6 +55,7 @@ export function UserMenu({
   email,
   onLogout,
   onSettings,
+  items,
   links = [],
   notice,
   label = "Account",
@@ -69,12 +80,27 @@ export function UserMenu({
           {email || "…"}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {onSettings ? (
+        {onSettings || items?.length ? (
           <>
-            <DropdownMenuItem className="gap-2" onSelect={onSettings}>
-              <Settings className="h-4 w-4" />
-              {settingsLabel}
-            </DropdownMenuItem>
+            {onSettings ? (
+              <DropdownMenuItem className="gap-2" onSelect={onSettings}>
+                <Settings className="h-4 w-4" />
+                {settingsLabel}
+              </DropdownMenuItem>
+            ) : null}
+            {items?.map((item) => {
+              const Icon = item.icon;
+              return (
+                <DropdownMenuItem
+                  key={item.id}
+                  className="gap-2"
+                  onSelect={item.onSelect}
+                >
+                  {Icon ? <Icon className="h-4 w-4" /> : null}
+                  {item.label}
+                </DropdownMenuItem>
+              );
+            })}
             <DropdownMenuSeparator />
           </>
         ) : null}

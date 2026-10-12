@@ -28,6 +28,13 @@ another page altogether.
 The links are the host's too: which applications exist and where each one answers is a
 deployment fact, and this package knows no deployment.
 
+## The app's own pages: `onSettings` and `items`
+
+Settings is the one page every host has a name for; `items` are any others of the SAME app the host
+wants within reach — a machine's engine, say — drawn as rows under Settings, in its group. They are
+callbacks, not links: they are pages of this app, opened in place by the host's own router, where
+the links below leave for another application.
+
 ## A new tab
 
 The rows are plain `<a href>` carrying `target="_blank"`. They are other **applications**, not
