@@ -43,6 +43,7 @@
     "./user-menu": "./src/user-menu.tsx",
     "./calendar": "./src/calendar.tsx",
     "./dialog": "./src/dialog.tsx",
+    "./dev-perf": "./src/dev-perf.ts",
     "./dropdown-menu": "./src/dropdown-menu.tsx",
     "./lib/utils": "./src/lib/utils.ts"
   },

@@ -13,14 +13,14 @@
 // Configure via environment variables (per consuming app):
 //   OIDC_ISSUER          e.g. https://accounts.google.com  or  Keycloak realm URL
 //   OIDC_CLIENT_ID
-//   OIDC_CLIENT_SECRET
+//   OIDC_CLIENT_SECRET   absent for a public client (PKCE only)
 //   SESSION_SECRET       cookie signing secret
 //
 // Nothing here configures our *own* host. The SPA and this backend share one
 // origin, so anything host-shaped is derived from the incoming request instead:
 // the redirect_uri (see redirectUriFor), the post-login target (a relative path
 // — "/" unless the SPA passed ?return_to=, see safeReturnTarget), and the
-// cookie's Secure flag. See apps/z0 for the same pattern.
+// cookie's Secure flag. z0's repository follows the same pattern.
 //
 // If OIDC_ISSUER / OIDC_CLIENT_ID are absent, the server falls back to a DEV
 // AUTH stub (a single "Dev User") so the app is runnable locally without an
@@ -350,6 +350,8 @@ export async function setupAuth(
         return new issuer.Client({
           client_id: clientId,
           client_secret: OIDC_CLIENT_SECRET,
+          // No secret is a PUBLIC client (a desktop app cannot keep one): PKCE alone proves the callback.
+          ...(OIDC_CLIENT_SECRET ? {} : { token_endpoint_auth_method: "none" }),
           // No redirect_uris: it is per-request (redirectUriFor), passed explicitly by every call below.
           response_types: ["code"],
         });

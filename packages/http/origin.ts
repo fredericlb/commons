@@ -5,7 +5,7 @@
 // app URL in the environment. Anything absolute (the OIDC redirect_uri, the
 // cookie's Secure flag, a canonical link) is derived from the incoming request
 // instead. These two helpers are that derivation, and they were living verbatim
-// in both @frediverse/oidc (openid-client based) and apps/z0's
+// in both @frediverse/oidc (openid-client based) and z0's repository's
 // hand-rolled auth (jose based). Extracted here so the two auth stacks share
 // ONE copy without either taking on the other's dependencies. Reachable as
 // @frediverse/http/origin — its own entry point, so importing it never drags

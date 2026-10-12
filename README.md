@@ -5,7 +5,7 @@ mounted at `commons/` by [studio](../studio) (radiok7, lanes, z0) and
 [phare](../phare) (vestibule, calepin, routine, douane, labs).
 
 ```
-packages/   @frediverse/{ui,i18n,http,oidc,db-grist}   — runtime libraries
+packages/   @frediverse/{ui,i18n,http,oidc,db-grist,electron-shell}   — runtime libraries
 dev/        @frediverse/{api-client,env,vite-config,tsconfig,docker-runtime}
 scripts/    caddy.mjs, build-images.sh, check-image-closure.cjs, i18n-migration/
 caddy/      global.caddy — the one Caddy global-options block
