@@ -9,6 +9,7 @@ import {
   type ProxyOptions,
   type UserConfig,
 } from "vite";
+import { compression } from "vite-plugin-compression2";
 import { VitePWA } from "vite-plugin-pwa";
 
 // The Vite setup every SPA in this monorepo repeated verbatim: React +
@@ -228,6 +229,8 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
       tailwindcss(),
       brandFonts,
       upgradeSocketGuard,
+      // A .gz and a .br beside every text asset, which the server sends as they are (docs/compression.md).
+      compression(),
       ...(options.pwa === false
         ? []
         : [

@@ -337,23 +337,44 @@ export async function setupAuth(
   );
 
   const devMode = !OIDC_ISSUER || !OIDC_CLIENT_ID;
-  let client: Client | null = null;
+
+  // Discovered on first use and never awaited at boot, so an unreachable IdP costs a login, not the server (docs/discovery.md).
+  let discovery: Promise<Client> | null = null;
+  const getClient = (): Promise<Client> => {
+    const clientId = OIDC_CLIENT_ID;
+    if (!OIDC_ISSUER || !clientId)
+      return Promise.reject(new Error("OIDC is not configured"));
+    discovery ??= Issuer.discover(OIDC_ISSUER).then(
+      (issuer) => {
+        console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
+        return new issuer.Client({
+          client_id: clientId,
+          client_secret: OIDC_CLIENT_SECRET,
+          // No redirect_uris: it is per-request (redirectUriFor), passed explicitly by every call below.
+          response_types: ["code"],
+        });
+      },
+      (err: Error) => {
+        // Forgotten, so the next login asks again rather than replaying this failure.
+        discovery = null;
+        throw err;
+      },
+    );
+    return discovery;
+  };
 
   if (devMode) {
     console.warn(
       "⚠️  OIDC not configured — running in DEV AUTH mode (stub 'Dev User').\n" +
         "    Set OIDC_ISSUER / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET for real auth.",
     );
-  } else {
-    const issuer = await Issuer.discover(OIDC_ISSUER!);
-    client = new issuer.Client({
-      client_id: OIDC_CLIENT_ID!,
-      client_secret: OIDC_CLIENT_SECRET,
-      // No redirect_uris here: it's per-request now (redirectUriFor), so every
-      // call below passes it explicitly rather than defaulting to a fixed one.
-      response_types: ["code"],
-    });
-    console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
+  } else if (mounted.has("login") || mounted.has("callback")) {
+    // Warmed now so the first login does not wait for it; a failure here is only a log line.
+    getClient().catch((err: Error) =>
+      console.warn(
+        `⚠️  OIDC discovery failed (${err.message}) — retried on the next login`,
+      ),
+    );
   }
 
   // /auth/me and /auth/logout are now called cross-origin (k7.st0.app,
@@ -380,7 +401,7 @@ export async function setupAuth(
   // Each is opt-out via opts.mountRoutes, for an app that answers it itself.
 
   if (mounted.has("login"))
-    app.get("/auth/login", (req: Request, res: Response) => {
+    app.get("/auth/login", async (req: Request, res: Response) => {
       const session = req.session!;
       const return_to = requestedReturnTo(req);
       if (devMode) {
@@ -391,9 +412,18 @@ export async function setupAuth(
           email: "dev@example.com",
           groups: [],
         };
-        return res.redirect(
-          safeReturnTarget(return_to, req, trustedOrigins),
-        );
+        return res.redirect(safeReturnTarget(return_to, req, trustedOrigins));
+      }
+      let client: Client;
+      try {
+        client = await getClient();
+      } catch (err) {
+        console.error("OIDC discovery error:", (err as Error).message);
+        return res
+          .status(503)
+          .send(
+            "The sign-in service cannot be reached. <a href='/auth/login'>Try again</a>",
+          );
       }
       const code_verifier = generators.codeVerifier();
       const state = generators.state();
@@ -403,7 +433,7 @@ export async function setupAuth(
       // it against its registered list.
       session.oidc = { code_verifier, state, nonce, return_to };
       res.redirect(
-        client!.authorizationUrl({
+        client.authorizationUrl({
           redirect_uri: redirectUriFor(req),
           scope,
           code_challenge: generators.codeChallenge(code_verifier),
@@ -419,9 +449,10 @@ export async function setupAuth(
       if (devMode) return res.redirect(APP_ROOT);
       try {
         const session = req.session!;
-        const params = client!.callbackParams(req);
+        const client = await getClient();
+        const params = client.callbackParams(req);
         const { code_verifier, state, nonce, return_to } = session.oidc || {};
-        const tokenSet = await client!.callback(redirectUriFor(req), params, {
+        const tokenSet = await client.callback(redirectUriFor(req), params, {
           code_verifier,
           state,
           nonce,
@@ -432,7 +463,7 @@ export async function setupAuth(
         // Merge it in (best-effort) so we can show a real name.
         let profile: Record<string, unknown> = claims;
         try {
-          const info = await client!.userinfo(tokenSet);
+          const info = await client.userinfo(tokenSet);
           profile = { ...claims, ...info };
         } catch {
           /* UserInfo is optional — fall back to the ID-token claims */

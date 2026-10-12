@@ -63,6 +63,7 @@ RUN mkdir -p /var/lib/nginx/logs /var/lib/nginx/tmp /var/log/nginx /run/nginx \
 # Shared runtime bits.
 COPY dev/docker-runtime/entrypoint.sh /entrypoint.sh
 COPY dev/docker-runtime/proxy-common.conf /etc/nginx/snippets/proxy-common.conf
+COPY dev/docker-runtime/gzip-static.conf /etc/nginx/http.d/gzip-static.conf
 RUN chmod +x /entrypoint.sh
 
 WORKDIR /app

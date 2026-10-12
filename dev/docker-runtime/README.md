@@ -12,6 +12,7 @@ every app image, so its `COPY` paths are repo-root-relative.
 |------|-------------|--------------|
 | `entrypoint.sh` | `/entrypoint.sh` (the base image's `ENTRYPOINT`) | Runs the app's backend — whatever its `CMD` is — alongside nginx, and tears both down if either dies. |
 | `proxy-common.conf` | `/etc/nginx/snippets/proxy-common.conf` | The `proxy_set_header` block every app repeated in each proxying `location`. |
+| `gzip-static.conf` | `/etc/nginx/http.d/gzip-static.conf` | `gzip_static on` for every app: the `.gz` the Vite build wrote beside an asset is sent instead of the asset (`dev/vite-config/docs/compression.md`). |
 
 The Dockerfile also settles two things every app inherits:
 

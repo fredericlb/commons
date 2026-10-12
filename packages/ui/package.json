@@ -28,6 +28,7 @@
     "./form": "./src/form.tsx",
     "./hamburger-menu": "./src/hamburger-menu.tsx",
     "./icons": "./src/icons.ts",
+    "./icons/all": "./src/icons-all.ts",
     "./frediverse-mark": "./src/frediverse-mark.tsx",
     "./checkbox": "./src/checkbox.tsx",
     "./popover": "./src/popover.tsx",

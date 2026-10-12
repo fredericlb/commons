@@ -43,3 +43,16 @@ legacy button sits on the line without a flex wrapper. Inside a flex parent the 
 Glyphs that are **content**, not pictures of an action: note names (`C♯`, `B♭`), a multiplier
 (`×2`), an arrow inside a sentence, a password mask. And anything drawn on a `<canvas>`, where
 an SVG component cannot go.
+
+## An icon chosen by NAME: `@frediverse/ui/icons/all`
+
+An icon a person picks — a menu entry's, a command's — is not known when the code is written, so it
+cannot be imported by name. Reading the whole `@frediverse/ui/icons` namespace to look one up keeps
+every icon in whichever chunk holds the static imports, which is the first screen's: about 190 KB
+gzipped to draw a few dozen.
+
+`@frediverse/ui/icons/all` is the same components through lucide's per-icon index, a module of its
+own. Import it with `import()`, at the moment a name has to be resolved: the bundle then splits it
+into a chunk loaded on demand, and the static `@frediverse/ui/icons` imports tree-shake back to the
+icons the code actually draws.
+
