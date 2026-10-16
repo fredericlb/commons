@@ -7,7 +7,7 @@ unchanged, behind one window. It holds nothing about any one app: what is an app
 |---|---|
 | `servers` | a server started with Electron as its node — under tsx, or bundled — waited for, stopped |
 | `guard` | the entry that leads each server's process group — built beside the main process |
-| `log` | one merged log, every line prefixed by who said it |
+| `log` | one merged log, every line prefixed by who said it, buffered |
 | `boot` | the ports checked free, the session secret kept across launches |
 | `window` | the window, and which links stay in it |
 | `external` | `openExternalSafely`, the one way a URL reaches the OS |
@@ -58,6 +58,10 @@ the server's environment and gives it a stdin pipe; a server that reads the vari
 the end of its stdin as its stop signal, and should delete the variable so its own children do
 not inherit it. `taskkill /T /F` comes only once the grace is up.
 
+**A failed boot is shown by the app when it can.** An app whose window is already open passes
+`showFailure` and puts the error there; the app then stays up until that window is closed.
+Without it, or when it returns false, the shell opens an error box naming the log and quits.
+
 **Quit waits for the app's `stop`, and only so long.** `lifecycle` holds Electron's quit until
 it resolves, so the app decides the order its children go down in. A `stop` that throws or hangs
 past `stopTimeoutMs` still ends in `app.exit(0)`: an app that never exits is worse than a server
@@ -67,6 +71,16 @@ stopped by its guard, which closing the app's pipes does anyway.
 when it has one, and the quit waits for its promise up to 3 s. A page that holds typed text not
 yet on disk sets it, since the servers it writes through are about to go. The shell names no
 page: a page without the hook is simply not asked.
+
+## The log
+
+**One write stream, never a synchronous write.** Every child's stdout and stderr is relayed
+through `line`, on the main process — the thread that also runs the window's IPC — so a chatty
+server would otherwise stall it on the disk once per line. The stream buffers instead, and the
+quit closes it after `stop`, just before `app.exit`: a line written between the two is still
+on disk. A crash of the main process loses what is still buffered, a fraction of a second of
+lines. `echo: false` also keeps the lines off stdout, which a packaged
+app has nobody reading.
 
 ## The window
 

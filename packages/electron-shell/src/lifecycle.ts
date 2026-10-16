@@ -3,11 +3,14 @@
 // Before `stop`, every page runs its `__beforeQuit`; and the whole quit is capped, so a throw or a hang still exits.
 
 import { app, dialog, webContents } from "electron";
-import { line } from "./log.ts";
+import { closeLog, line } from "./log.ts";
 import { GUARD_WAIT_MS } from "./stopTimes.ts";
 
 /** How long the pages get to write what they hold before the servers are stopped. */
 const FLUSH_MS = 3_000;
+
+/** How long the log gets to write what it buffers before the app exits. */
+const LOG_CLOSE_MS = 2_000;
 
 /** The page hook a quit calls: a page that holds unsaved work sets it, and the promise it returns is awaited. */
 const BEFORE_QUIT =
@@ -45,8 +48,10 @@ export interface AppSpec {
   title: string;
   /** Named in that box, so the person knows where to look. */
   logPath: string;
-  /** Starts the servers and opens the window; a throw ends the app. */
+  /** Starts the servers and opens the window; a throw ends the app, unless `showFailure` takes it. */
   boot: () => Promise<void>;
+  /** A failed boot shown by the app itself, in a window it keeps open; false leaves it to the error box and the quit. */
+  showFailure?: (why: string) => boolean;
   /** Stops what boot started, in the order it needs. */
   stop: () => Promise<void>;
   /** How long `stop` may take before the app exits anyway; the guards still stop their servers then. */
@@ -71,6 +76,7 @@ export function runApp(spec: AppSpec): void {
     return spec.boot().catch((e: unknown) => {
       const why = e instanceof Error ? e.message : String(e);
       line("app", `failed to start: ${why}`);
+      if (spec.showFailure?.(why)) return;
       dialog.showErrorBox(
         `${spec.title} could not start`,
         `${why}\n\nLog: ${spec.logPath}`,
@@ -101,6 +107,8 @@ export function runApp(spec: AppSpec): void {
       } catch (e: unknown) {
         line("app", `stop failed: ${e instanceof Error ? e.message : e}`);
       } finally {
+        // The log is buffered: closed last, so the quit's own lines reach the file.
+        await within(closeLog(), LOG_CLOSE_MS);
         app.exit(0);
       }
     })();
