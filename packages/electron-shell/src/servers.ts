@@ -5,6 +5,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { line, relay } from "./log.ts";
+import { GUARD_WAIT_MS } from "./stopTimes.ts";
 
 export interface Server {
   name: string;
@@ -87,17 +88,17 @@ export async function waitListening(
   );
 }
 
-/** Stop the server and everything it spawned; SIGKILL whatever is still there after the grace period. */
-export async function stopServer(s: Server, graceMs = 3_000): Promise<void> {
+/** Stop the server and everything it spawned; kill whatever is still there once the guard had its time. */
+export async function stopServer(
+  s: Server,
+  waitMs = GUARD_WAIT_MS,
+): Promise<void> {
   const pid = s.child.pid;
   if (pid === undefined || s.child.exitCode !== null) return;
   const exited = new Promise<void>((r) => s.child.once("exit", () => r()));
   // The guard's own way out first; the sweep below is for a guard that did not take it.
   s.child.stdin?.end();
-  await Promise.race([
-    exited,
-    new Promise((r) => setTimeout(r, graceMs + 1_000)),
-  ]);
+  await Promise.race([exited, new Promise((r) => setTimeout(r, waitMs))]);
   if (s.child.exitCode !== null || s.child.signalCode !== null) return;
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"]);

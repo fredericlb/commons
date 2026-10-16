@@ -40,8 +40,30 @@ Stopping from the main process alone is not enough: a main process that dies nev
 shutdown, and its detached children keep the ports, which the next launch reports as already in
 use. A server that exits on its own takes its group with it for the same reason.
 
-**Quit waits for the app's `stop`.** `lifecycle` holds Electron's quit until it resolves, so the
-app decides the order its children go down in.
+**The server is asked first, alone; the group after it.** A server that spawned children of its
+own (k7's backend runs a file service per account) stops them in the order it needs, and a
+SIGTERM to the whole group would race it: a child killed before its parent asked it to stop is a
+write cut in half. So the guard asks the server only — its stdin closed, and SIGTERM where there
+is one — and gives it `SERVER_GRACE_MS` (`src/stopTimes.ts`), longer than any server here needs
+for its own stop. When the server exits, or the grace is up, whatever is left of the group gets
+SIGTERM, then SIGKILL after `SWEEP_GRACE_MS`. The main process waits for the guard longer than
+both before it kills the group itself.
+
+**On Windows the graceful stop is stdin.** There is no SIGTERM there: Node's `kill` and
+`taskkill /F` both end a process on the spot. The guard sets `ELECTRON_SHELL_STDIN_STOP=1` in
+the server's environment and gives it a stdin pipe; a server that reads the variable treats
+the end of its stdin as its stop signal, and should delete the variable so its own children do
+not inherit it. `taskkill /T /F` comes only once the grace is up.
+
+**Quit waits for the app's `stop`, and only so long.** `lifecycle` holds Electron's quit until
+it resolves, so the app decides the order its children go down in. A `stop` that throws or hangs
+past `stopTimeoutMs` still ends in `app.exit(0)`: an app that never exits is worse than a server
+stopped by its guard, which closing the app's pipes does anyway.
+
+**The pages write first.** Before `stop`, every page is asked to run `globalThis.__beforeQuit`,
+when it has one, and the quit waits for its promise up to 3 s. A page that holds typed text not
+yet on disk sets it, since the servers it writes through are about to go. The shell names no
+page: a page without the hook is simply not asked.
 
 ## The window
 
