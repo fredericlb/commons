@@ -13,6 +13,8 @@
     "./permissions": "./src/permissions.ts",
     "./policy": "./src/policy.ts",
     "./lifecycle": "./src/lifecycle.ts",
+    "./dialogs": "./src/dialogs.ts",
+    "./windowState": "./src/windowState.ts",
     "./guard": "./src/guard.ts",
     "./build": "./scripts/build.mjs",
     "./start": "./scripts/start.mjs",

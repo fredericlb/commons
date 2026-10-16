@@ -1,8 +1,9 @@
-// lifecycle.ts — one copy of the app, a boot that reports its failure, and a quit that waits for the app's own teardown.
+// lifecycle.ts — one copy of the app, a boot whose failure offers Retry / Open log / Quit, and a quit that waits for the app's own teardown.
 // Quit is held until `stop` resolves: the servers are children, and an app that exits first leaves them holding the ports.
-// Before `stop`, every page runs its `__beforeQuit`; and the whole quit is capped, so a throw or a hang still exits.
+// The windows are hidden the moment it starts, so a teardown of many seconds never looks like a frozen window. See docs/shell.md.
 
-import { app, dialog, webContents } from "electron";
+import { app, BaseWindow, webContents } from "electron";
+import { askAfterFailure } from "./dialogs.ts";
 import { closeLog, line } from "./log.ts";
 import { GUARD_WAIT_MS } from "./stopTimes.ts";
 
@@ -17,7 +18,7 @@ const BEFORE_QUIT =
   'typeof globalThis.__beforeQuit === "function" ? globalThis.__beforeQuit() : null';
 
 /** `p`, or undefined once `ms` passed — whichever comes first. */
-function within<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+export function within<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
   let timer: NodeJS.Timeout | undefined;
   const late = new Promise<undefined>((r) => {
     timer = setTimeout(() => r(undefined), ms);
@@ -43,15 +44,24 @@ async function flushPages(): Promise<void> {
   );
 }
 
+/** Out of sight at once; still alive, and not throttled, since their pages are flushed next. */
+function hideWindows(): void {
+  for (const w of webContents.getAllWebContents())
+    if (!w.isDestroyed()) w.setBackgroundThrottling(false);
+  for (const w of BaseWindow.getAllWindows()) if (!w.isDestroyed()) w.hide();
+}
+
 export interface AppSpec {
-  /** Shown in the error box a failed boot opens: "<title> could not start". */
+  /** Heads the dialog a failed boot opens: "<title> could not start". */
   title: string;
-  /** Named in that box, so the person knows where to look. */
+  /** Named in that dialog, and opened by its Open log. */
   logPath: string;
-  /** Starts the servers and opens the window; a throw ends the app, unless `showFailure` takes it. */
+  /** Starts the servers and opens the window; a throw is a failed boot. */
   boot: () => Promise<void>;
-  /** A failed boot shown by the app itself, in a window it keeps open; false leaves it to the error box and the quit. */
-  showFailure?: (why: string) => boolean;
+  /** A failed boot painted in the app's own window too, which the dialog is then attached to. */
+  showFailure?: (why: string) => void;
+  /** Asked before a quit the person started; false keeps the app running. A throw counts as yes. */
+  confirmQuit?: () => Promise<boolean>;
   /** Stops what boot started, in the order it needs. */
   stop: () => Promise<void>;
   /** How long `stop` may take before the app exits anyway; the guards still stop their servers then. */
@@ -66,22 +76,43 @@ export interface AppSpec {
   windowless?: boolean;
 }
 
-export function runApp(spec: AppSpec): void {
+export interface RunningApp {
+  /** Quit without `confirmQuit`: the person already chose to. */
+  quitNow: () => void;
+  /** Quit, then start again: a fresh boot, with nothing of this one left. */
+  relaunch: () => void;
+}
+
+export function runApp(spec: AppSpec): RunningApp {
   if (!app.requestSingleInstanceLock()) app.exit(0);
   app.on("second-instance", spec.onSecondInstance);
+
+  let quitting = false;
+  let asking = false;
+  let confirmed = false;
+  const quitNow = () => {
+    confirmed = true;
+    app.quit();
+  };
+  const relaunch = () => {
+    app.relaunch();
+    quitNow();
+  };
 
   app.whenReady().then(() => {
     if (spec.windowless) app.dock?.hide();
     else if (!app.isPackaged && spec.devIcon) app.dock?.setIcon(spec.devIcon);
-    return spec.boot().catch((e: unknown) => {
+    return spec.boot().catch(async (e: unknown) => {
       const why = e instanceof Error ? e.message : String(e);
       line("app", `failed to start: ${why}`);
-      if (spec.showFailure?.(why)) return;
-      dialog.showErrorBox(
-        `${spec.title} could not start`,
-        `${why}\n\nLog: ${spec.logPath}`,
-      );
-      app.quit();
+      spec.showFailure?.(why);
+      const choice = await askAfterFailure({
+        title: `${spec.title} could not start`,
+        message: why,
+        logPath: spec.logPath,
+      });
+      if (choice === "retry") relaunch();
+      else quitNow();
     });
   });
 
@@ -90,11 +121,24 @@ export function runApp(spec: AppSpec): void {
     if (!spec.windowless) app.quit();
   });
 
-  let quitting = false;
   app.on("before-quit", (event) => {
     if (quitting) return;
-    quitting = true;
     event.preventDefault();
+    if (asking) return;
+    if (spec.confirmQuit && !confirmed) {
+      asking = true;
+      void spec
+        .confirmQuit()
+        .catch(() => true)
+        .then((yes) => {
+          asking = false;
+          if (yes) quitNow();
+          else line("app", "quit cancelled");
+        });
+      return;
+    }
+    quitting = true;
+    hideWindows();
     void (async () => {
       line("app", "quitting");
       try {
@@ -114,6 +158,9 @@ export function runApp(spec: AppSpec): void {
     })();
   });
 
+  // A signal is no person to ask.
   for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const)
-    process.on(sig, () => app.quit());
+    process.on(sig, quitNow);
+
+  return { quitNow, relaunch };
 }

@@ -5,15 +5,17 @@ unchanged, behind one window. It holds nothing about any one app: what is an app
 
 | subpath | what it holds |
 |---|---|
-| `servers` | a server started with Electron as its node — under tsx, or bundled — waited for, stopped |
+| `servers` | a server started with Electron as its node — under tsx, or bundled — waited for, restarted when it crashes, stopped |
 | `guard` | the entry that leads each server's process group — built beside the main process |
 | `log` | one merged log, every line prefixed by who said it, buffered |
-| `boot` | the ports checked free, the session secret kept across launches |
+| `boot` | the ports checked free — naming who holds one — and the session secret kept across launches |
+| `dialogs` | the failure dialog — Retry, Open log, Quit — and the `keepAlive` that asks it of a server given up on |
 | `window` | the window, and which links stay in it |
+| `windowState` | a window's bounds kept across launches, fitted onto a display that is there |
 | `external` | `openExternalSafely`, the one way a URL reaches the OS |
 | `permissions` | the session's permission handlers, request and check |
 | `policy` | the two decisions behind those, pure: which URL may leave, which frame gets a permission |
-| `lifecycle` | one copy of the app, a boot that reports its failure, a quit that waits |
+| `lifecycle` | one copy of the app, a boot whose failure can be retried, a quit that can be declined and that waits |
 | `build`, `start`, `builder` | the esbuild bundle, the unpackaged run, the electron-builder base |
 
 ## The servers run unchanged
@@ -58,9 +60,45 @@ the server's environment and gives it a stdin pipe; a server that reads the vari
 the end of its stdin as its stop signal, and should delete the variable so its own children do
 not inherit it. `taskkill /T /F` comes only once the grace is up.
 
-**A failed boot is shown by the app when it can.** An app whose window is already open passes
-`showFailure` and puts the error there; the app then stays up until that window is closed.
-Without it, or when it returns false, the shell opens an error box naming the log and quits.
+## When something fails
+
+**Every failure gets one dialog: Retry, Open log, Quit** (`src/dialogs.ts`). Open log opens the
+merged log in the system's viewer and leaves the dialog up, so the person reads, then chooses. A
+failure is never a box with only an OK button: the person who meets it has nothing to type and
+nobody to ask, and the dialog's three choices are everything they can do.
+
+**A failed boot is retried by relaunching the app**, not by calling `boot` again. A boot that
+went half way has opened windows, registered IPC handlers and started children; running it twice
+in one process doubles them. `app.relaunch()` and the ordinary quit leave nothing of the first
+try. An app whose window is already open passes `showFailure` to paint the error there too, and
+the dialog is attached to that window.
+
+**A port already taken names who holds it, when it can.** `assertPortsFree` asks `lsof` (macOS,
+Linux) or `netstat` and `tasklist` (Windows), each capped at 2 s, and puts the command and pid in
+its message (`src/portHolder.ts`). It never says "another copy of the app": the single-instance
+lock rules that out for this user. What the lock cannot see is the app run by ANOTHER user
+account on the same machine, holding the same loopback port, and that is the case the message
+names. `lsof` without root does not list another user's processes, so an unknown holder is
+reported as one this account cannot see rather than as no holder.
+
+**A hosted server that crashes after it answered is started again** — with `keepAlive`, on
+1 s doubling to 30 s, a run of 20 s resetting the delay, as the supervisor host does
+(`src/restart.ts`). A crash loop is not retried for ever: past 5 crashes in 5 minutes the server
+stays down, and `keepAliveDialog` asks Restart (the server alone, its count cleared) or Quit.
+Until then the pages see their requests fail, which is what they would see of a hosted server
+restarting; `onState` is there for an app that wants to say so. A server that exits before it
+ever answered is a failed boot, reported by `waitListening`, never restarted.
+
+## Quit
+
+**Quit hides every window at once.** The teardown takes up to `GUARD_WAIT_MS` plus the flush,
+and a window left on screen through it looks frozen. The windows are hidden, not closed: their
+pages are flushed next, so their throttling is turned off first.
+
+**`confirmQuit` is asked before anything goes down**, when the app passes it: false keeps the app
+running. It is asked only for a quit a person started — not for a signal, a relaunch, or a Quit
+chosen in a failure dialog — and a hook that throws counts as yes, since a quit the person
+cannot complete is worse than one they did not confirm.
 
 **Quit waits for the app's `stop`, and only so long.** `lifecycle` holds Electron's quit until
 it resolves, so the app decides the order its children go down in. A `stop` that throws or hangs
@@ -89,6 +127,13 @@ among them, which a page opened by `window.open` would otherwise not get. Anythi
 the system browser, and a navigation away from the app's pages is turned into the same: a
 desktop app is not a browser, and has no address bar to come back with. A window a page opens
 is guarded exactly like the first one, since it can navigate and open windows in turn.
+
+**A window reopens where it was left** (`windowState`): its normal bounds and whether it was
+maximized, in a JSON file the app names. The normal bounds, so a maximized window unmaximizes to
+where it was; fullscreen is not kept, since its bounds are the screen's. The saved rectangle is
+fitted onto the display it matches best now (`src/bounds.ts`): shrunk to that display's work
+area, then moved into it whole. A window saved on a monitor since unplugged opens on one that is
+there, never off screen.
 
 ## What reaches the OS
 

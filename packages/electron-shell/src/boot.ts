@@ -4,8 +4,9 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
+import { type PortHolder, portBusyMessage, portHolder } from "./portHolder.ts";
 
-/** Whether something already answers on `port` — a dev session, or a second copy of the app. */
+/** Whether something already answers on `port` — a dev session, or the app run by another user account. */
 export function portBusy(port: number): Promise<boolean> {
   return new Promise((res) => {
     const s = createConnection({ port, host: "127.0.0.1" });
@@ -17,13 +18,26 @@ export function portBusy(port: number): Promise<boolean> {
   });
 }
 
-/** Throws, naming the first port of `ports` that something already holds. */
-export async function assertPortsFree(ports: number[]): Promise<void> {
+/** A port the app needs, held by something else; `holder` when this account can see it. */
+export class PortBusyError extends Error {
+  constructor(
+    readonly port: number,
+    readonly holder: PortHolder | null,
+    app: string,
+  ) {
+    super(portBusyMessage(port, holder, app));
+    this.name = "PortBusyError";
+  }
+}
+
+/** Throws a PortBusyError for the first port of `ports` that something already holds; `app` names the app in its text. */
+export async function assertPortsFree(
+  ports: number[],
+  app = "This app",
+): Promise<void> {
   for (const port of ports)
     if (await portBusy(port))
-      throw new Error(
-        `port ${port} is already in use — is another copy of the app still running?`,
-      );
+      throw new PortBusyError(port, await portHolder(port), app);
 }
 
 /** A secret generated once and kept in `dir`, so a restart keeps every session signed with it. */
