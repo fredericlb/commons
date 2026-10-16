@@ -10,6 +10,9 @@ unchanged, behind one window. It holds nothing about any one app: what is an app
 | `log` | one merged log, every line prefixed by who said it |
 | `boot` | the ports checked free, the session secret kept across launches |
 | `window` | the window, and which links stay in it |
+| `external` | `openExternalSafely`, the one way a URL reaches the OS |
+| `permissions` | the session's permission handlers, request and check |
+| `policy` | the two decisions behind those, pure: which URL may leave, which frame gets a permission |
 | `lifecycle` | one copy of the app, a boot that reports its failure, a quit that waits |
 | `build`, `start`, `builder` | the esbuild bundle, the unpackaged run, the electron-builder base |
 
@@ -70,7 +73,40 @@ page: a page without the hook is simply not asked.
 An app's own pages open as more windows of the app, with the same `webPreferences` — a preload
 among them, which a page opened by `window.open` would otherwise not get. Anything else opens in
 the system browser, and a navigation away from the app's pages is turned into the same: a
-desktop app is not a browser, and has no address bar to come back with.
+desktop app is not a browser, and has no address bar to come back with. A window a page opens
+is guarded exactly like the first one, since it can navigate and open windows in turn.
+
+## What reaches the OS
+
+**Only `http:`, `https:` and `mailto:` are handed to `shell.openExternal`, never with a
+credential in the URL** (`externalUrl` in `src/policy.ts`). The OS answers every scheme it has a
+handler for: `file:` runs or reveals a local file, `smb:` leaks the user's NTLM hash to a remote
+share, `ms-msdt:` and `search-ms:` have been remote code execution on Windows, and any app can
+register one of its own. A page that calls `window.open` needs no click to reach that path, so
+an app calls `openExternalSafely` and never `shell.openExternal` itself. A refused URL is logged by
+its scheme alone and dropped.
+
+## Permissions
+
+**An app that hosts its pages installs `installPermissions` on its session.** Without a
+handler, Electron grants every permission to every frame — a foreign iframe's geolocation and
+notifications included. The handlers answer the request and the check alike, since most web APIs
+check first and some only check.
+
+A permission is granted when it is listed, the frame asking is on one of the app's origins, and
+so is the page at the top of its tree. Its scope then says which frame: `top` for the app's top
+frame alone, `app` for any of the app's frames inside one of its pages. The defaults are:
+
+| permission | scope | why |
+|---|---|---|
+| `media` | `top` | a mic or a camera, for the page the user is looking at |
+| `clipboard-sanitized-write` | `top` | a Copy button |
+| `fullscreen` | `app` | an element made fullscreen; an iframe still needs `allowfullscreen` |
+
+An app adds or widens what it needs (`grants`); everything else is refused, `geolocation`,
+`notifications`, `clipboard-read`, `display-capture`, the device APIs and `openExternal`
+among them. An external protocol a page navigates to (`openExternal`) is refused to Chromium and,
+when an app frame asked, handed to `openExternalSafely` instead, so a `mailto:` link still works.
 
 ## Building and packaging
 
