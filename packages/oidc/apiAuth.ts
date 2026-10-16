@@ -6,7 +6,20 @@
 // stay unaffected.
 
 import type { RequestHandler } from "express";
-import { createApiTokens } from "./apiToken.ts";
+import {
+  type ApiTokenStore,
+  createApiTokens,
+  type IssueOptions,
+} from "./apiToken.ts";
+
+export {
+  API_TOKEN_TTL_MS,
+  type ApiTokenRecord,
+  type ApiTokenStore,
+  fileTokenStore,
+  type IssueOptions,
+  memoryTokenStore,
+} from "./apiToken.ts";
 
 /**
  * Let a client authenticate with `Authorization: Bearer <token>` instead of the
@@ -31,15 +44,17 @@ export function bearerOrSession(
   };
 }
 
-/**
- * The common case: mint the token scheme from a secret and return both the
- * middleware and the issuer the /token route needs.
- */
-export function apiTokenAuth(secret: string) {
-  const { issue, verify } = createApiTokens(secret);
+/** The common case: the token scheme from a secret, with the middleware and the routes' verbs. */
+export function apiTokenAuth(
+  secret: string,
+  opts: { ttlMs?: number; store?: ApiTokenStore } = {},
+) {
+  const { issue, verify, list, revoke } = createApiTokens(secret, opts);
   return {
-    issueApiToken: issue,
+    issueApiToken: (sub: string, o?: IssueOptions) => issue(sub, o),
     verifyApiToken: verify,
+    listApiTokens: list,
+    revokeApiToken: revoke,
     bearerOrSession: (requireAuth: RequestHandler) =>
       bearerOrSession(requireAuth, verify),
   };

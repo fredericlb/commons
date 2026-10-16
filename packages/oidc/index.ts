@@ -1,34 +1,13 @@
-// Shared OIDC (OpenID Connect) authentication for the frediverse apps.
-//
-// Uses the Authorization Code flow with PKCE via `openid-client`. The backend
-// is a confidential client: it performs the token exchange and stores the user
-// in a signed session cookie. The SPA never handles tokens directly.
-//
-// The session is *stateless*: the (small) user object is serialized into the
-// signed cookie itself via `cookie-session`, not held in server memory. This is
-// deliberate — an in-memory store is wiped on every backend restart (e.g. the
-// `node --watch` dev server), which logs the user out on the next page reload.
-// Keeping the session in the cookie makes it survive restarts.
-//
-// Configure via environment variables (per consuming app):
-//   OIDC_ISSUER          e.g. https://accounts.google.com  or  Keycloak realm URL
-//   OIDC_CLIENT_ID
-//   OIDC_CLIENT_SECRET   absent for a public client (PKCE only)
-//   SESSION_SECRET       cookie signing secret
-//
-// Nothing here configures our *own* host. The SPA and this backend share one
-// origin, so anything host-shaped is derived from the incoming request instead:
-// the redirect_uri (see redirectUriFor), the post-login target (a relative path
-// — "/" unless the SPA passed ?return_to=, see safeReturnTarget), and the
-// cookie's Secure flag. z0's repository follows the same pattern.
-//
-// If OIDC_ISSUER / OIDC_CLIENT_ID are absent, the server falls back to a DEV
-// AUTH stub (a single "Dev User") so the app is runnable locally without an
-// identity provider. Auth is still mandatory — you must "log in" as that user.
+// Shared OIDC (OpenID Connect) authentication for the frediverse apps: the Authorization Code flow
+// with PKCE (openid-client), the user kept in a SIGNED cookie (cookie-session) rather than in memory,
+// so a session survives a backend restart. Nothing host-shaped is configured: the redirect_uri, the
+// post-login target and the cookie's Secure flag all derive from the request.
+// What a reader gets wrong: a signed cookie is not a valid session. Its stamps (iat, exp), the age
+// of its groups and the subject's revocation epoch are checked on every request (docs/session.md).
+// Without OIDC_ISSUER / OIDC_CLIENT_ID the server runs a DEV stub user instead of an IdP.
 
 import { defineEnv, z } from "@frediverse/env";
 import { publicOrigin, redirectUriFor } from "@frediverse/http/origin";
-import cookieSession from "cookie-session";
 import type {
   Express,
   NextFunction,
@@ -36,14 +15,49 @@ import type {
   RequestHandler,
   Response,
 } from "express";
-import Keygrip from "keygrip";
 import { type Client, generators, Issuer } from "openid-client";
+import {
+  APP_ROOT,
+  isSameOriginRequest,
+  safeReturnTarget,
+} from "./returnTarget.ts";
+import {
+  clearSessionUser,
+  createSessionRevocations,
+  SESSION_MAX_AGE_MS,
+  type SessionPolicy,
+  type SessionRevocations,
+  type SessionUser,
+  sessionMiddleware,
+  stampSession,
+  validSessionUser,
+} from "./session.ts";
 
 // The other way in: HMAC bearer tokens for clients that can't hold a cookie.
-export { type ApiTokens, createApiTokens } from "./apiToken.ts";
-// Host derivation (publicOrigin, redirectUriFor) lives in the shared
-// @frediverse/http/origin module so this stack and z0's keep ONE copy.
-// Re-exported here so existing importers of @frediverse/oidc are unaffected.
+export {
+  API_TOKEN_TTL_MS,
+  type ApiTokenRecord,
+  type ApiTokenStore,
+  type ApiTokens,
+  createApiTokens,
+  fileTokenStore,
+  type IssueOptions,
+  memoryTokenStore,
+} from "./apiToken.ts";
+export { isSameOriginRequest, safeReturnTarget } from "./returnTarget.ts";
+export {
+  createSessionRevocations,
+  GROUPS_MAX_AGE_MS,
+  SESSION_MAX_AGE_MS,
+  type SessionPolicy,
+  type SessionRevocations,
+  type SessionUser,
+  sessionCookieHeader,
+  sessionFromCookieHeader,
+  sessionMiddleware,
+  validSessionUser,
+} from "./session.ts";
+// Re-exported so importers of @frediverse/oidc need not know they live in @frediverse/http/origin.
 export { publicOrigin, redirectUriFor };
 
 /** The built-in routes setupAuth mounts. */
@@ -51,71 +65,48 @@ export type AuthRoute = "login" | "callback" | "logout" | "me";
 
 const ALL_ROUTES: AuthRoute[] = ["login", "callback", "logout", "me"];
 
-/**
- * The principal stored in the session cookie. `groups` comes from the IdP
- * (see isAdmin); the index signature lets an app carry its own fields via
- * `mapUser` (z0 tags each session with a `kind`).
- */
-export interface SessionUser {
-  sub?: string;
-  name?: string;
-  email?: string | null;
-  groups?: string[];
-  [key: string]: unknown;
-}
-
 export interface AuthOptions {
   /** Name of the session cookie (unique per app, e.g. "songs.sid"). */
   cookieName: string;
-  /**
-   * The caller's section in the root env.yaml (e.g. "radiok7-backend"), so the
-   * OIDC settings below resolve the same way as the rest of its config.
-   */
+  /** The caller's section in the root env.yaml (e.g. "radiok7-backend"), where the OIDC settings resolve. */
   service: string;
   /** Scopes to request. Default ["openid", "profile", "email"]. */
   scopes?: string[];
-  /**
-   * Which built-in routes to mount. Default: all. An app that answers one of
-   * these itself (z0's /auth/me carries extra gate flags) omits it here
-   * rather than relying on registration order to shadow ours.
-   */
+  /** Which built-in routes to mount. Default: all; an app answering one itself omits it. */
   mountRoutes?: AuthRoute[];
-  /**
-   * Shape the session user from the merged claims/UserInfo profile. Default:
-   * { sub, name, email, groups }. Return a superset to carry app-specific
-   * fields.
-   */
+  /** Shape the session user from the claims/UserInfo profile. Default { sub, name, email, groups }. */
   mapUser?: (profile: Record<string, unknown>) => SessionUser;
-  /**
-   * `Domain=` for the session cookie. Omitted (the default), falls back to
-   * env.yaml's `common.COOKIE_DOMAIN` for this service; still unset, the
-   * cookie stays host-only, exactly as before. Set this only when several
-   * apps on DIFFERENT hosts must share one cookie, e.g. ".st0.app". Pass ""
-   * explicitly to OPT OUT of the common section's value instead — for an app
-   * that is deliberately single-origin (z0) and must not pick up a sibling's
-   * cross-subdomain setting. Also switches SameSite from Lax to None (see
-   * sessionMiddleware): a cross-site fetch or <audio>/<img> load never
-   * carries a Lax cookie, only a top-level navigation does, so sharing a
-   * cookie across subdomains for anything but the login redirect needs
-   * None — which requires HTTPS.
-   */
+  /** `Domain=` for the cookie; default env's `COOKIE_DOMAIN`, "" opts out. Switches SameSite to None (docs/session.md). */
   cookieDomain?: string;
-  /**
-   * Extra origins safeReturnTarget accepts besides this request's own — for a
-   * login mounted on one app's origin that must bounce the browser back to
-   * another. Omitted (the default), falls back to env.yaml's
-   * `common.TRUSTED_ORIGINS` (comma-separated) for this service; still
-   * unset, only the request's own origin is trusted, exactly as before.
-   */
+  /** Origins besides the request's own that a return target and a logout may come from; default env's `TRUSTED_ORIGINS`. */
   trustedOrigins?: string[];
+  /** A session's lifetime from its sign-in. Default SESSION_MAX_AGE_MS (7 days). */
+  sessionMaxAgeMs?: number;
+  /** A session carrying groups is refused past this age, so a group removal lands. Default 12 h. */
+  groupsMaxAgeMs?: number;
+  /** Per-subject "not before" epochs. Default: in memory, so a revocation lasts until a restart. */
+  revocations?: SessionRevocations;
 }
 
-/**
- * Case-insensitive group membership test — the shared authorization primitive
- * on top of the `groups` claim (z0's auth.go used strings.EqualFold).
- * Pure: the caller passes its own admin list, since which groups are
- * privileged is per-app config, not per-IdP.
- */
+/** What setupAuth hands back. */
+export interface AuthHandle {
+  /** 401 unless the request carries a valid session; sets req.user. */
+  requireAuth: RequestHandler;
+  /** Sign `user` in on this request's session, stamped now (or with `from`'s stamps). */
+  startSession(
+    req: Request,
+    user: SessionUser,
+    from?: { iat: number; exp: number },
+  ): void;
+  /** The request's valid session user, or null. */
+  sessionUser(req: Request): SessionUser | null;
+  /** The request's session stamps, when it carries a valid user. */
+  sessionStamps(req: Request): { iat: number; exp: number } | null;
+  /** Kill every session of `sub` issued until now: a logout everywhere, or an account removed. */
+  revokeSessions(sub: string): void;
+}
+
+/** Case-insensitive group membership; the caller passes its own admin list, which is per-app config. */
 export function isAdmin(
   user: SessionUser | null | undefined,
   adminGroups: readonly string[],
@@ -125,171 +116,25 @@ export function isAdmin(
   return (user.groups ?? []).some((g) => admin.includes(g.toLowerCase()));
 }
 
-// Where we send the browser once it's logged in, when it didn't ask for
-// anywhere in particular. The SPA is served at the root of this same origin, so
-// a relative path is enough — and unlike an absolute APP_BASE_URL it can't be
-// pointed off-origin.
-const APP_ROOT = "/";
-
-// Minimal Cookie-header parser: enough for the two names we look up, and it
-// keeps this package free of a cookie-parsing dependency.
-function parseCookieHeader(header: string | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!header) return out;
-  for (const part of header.split(";")) {
-    const eq = part.indexOf("=");
-    if (eq < 0) continue;
-    const k = part.slice(0, eq).trim();
-    if (!k || k in out) continue;
-    const v = part.slice(eq + 1).trim();
-    try {
-      out[k] = decodeURIComponent(v);
-    } catch {
-      out[k] = v;
-    }
-  }
-  return out;
-}
-
-const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
-
-/**
- * The cookie-session middleware setupAuth installs. Exported so code that
- * builds its own express app (tests, chiefly) gets byte-identical cookie
- * settings instead of a copy that can drift from the real one.
- */
-export function sessionMiddleware(opts: {
-  cookieName: string;
-  secret: string;
-  /** `Domain=` — omitted keeps the cookie host-only, as before. */
-  domain?: string;
-}): RequestHandler {
-  return cookieSession({
-    name: opts.cookieName,
-    keys: [opts.secret],
-    httpOnly: true,
-    domain: opts.domain,
-    // Lax is sent on a same-origin call, and on a cross-site TOP-LEVEL
-    // navigation (the /auth/login redirect) — but never on a cross-site
-    // fetch/XHR or a cross-site <audio>/<img> load, no matter what
-    // `credentials`/CORS say. With a `domain` set, that IS the normal case
-    // (st0 calling pl8's API), so the cookie must be None instead — which
-    // browsers refuse to set without Secure, hence the pairing below.
-    sameSite: opts.domain ? "none" : "lax",
-    // `secure` is normally left undefined so the `cookies` lib decides per
-    // request (Secure over https, plain over local http), reading
-    // req.protocol — which honours the edge's X-Forwarded-Proto thanks to
-    // `trust proxy`. A `domain` forces it true instead: SameSite=None with
-    // Secure absent is not "maybe insecure", it's a cookie the browser drops
-    // outright — so a cross-subdomain deployment must be HTTPS, full stop.
-    secure: opts.domain ? true : undefined,
-    maxAge: SESSION_MAX_AGE_MS,
-  });
-}
-
-/**
- * Build the Cookie header for a session — the inverse of
- * sessionFromCookieHeader, producing exactly what cookie-session would issue.
- *
- * For callers that need a session cookie without an express response: chiefly
- * tests, which would otherwise each hand-roll the encoding and drift from it.
- */
-export function sessionCookieHeader(
-  user: SessionUser,
-  opts: { cookieName: string; secret: string; maxAgeMs?: number },
-): string {
-  const payload: Record<string, unknown> = { user };
-  if (opts.maxAgeMs !== undefined) payload._expire = Date.now() + opts.maxAgeMs;
-  const value = Buffer.from(JSON.stringify(payload)).toString("base64");
-  const sig = new Keygrip([opts.secret]).sign(`${opts.cookieName}=${value}`);
-  return `${opts.cookieName}=${value}; ${opts.cookieName}.sig=${sig}`;
-}
-
-/**
- * Read the session straight from a raw Cookie header, verifying the signature
- * the same way cookie-session does.
- *
- * For code that runs OUTSIDE the express middleware chain and so never gets a
- * populated `req.session` — in practice a WebSocket upgrade, which is a raw
- * http `upgrade` event (see z0's ws.ts). Returns null when the cookie
- * is absent, tampered with, or expired.
- */
-export function sessionFromCookieHeader(
-  header: string | undefined,
-  opts: { cookieName: string; secret: string },
-): SessionUser | null {
-  const cookies = parseCookieHeader(header);
-  const raw = cookies[opts.cookieName];
-  const sig = cookies[`${opts.cookieName}.sig`];
-  if (!raw || !sig) return null;
-  // cookie-session signs `<name>=<value>` with Keygrip (as the `cookies` lib
-  // does), so verify the same string rather than the value alone.
-  if (!new Keygrip([opts.secret]).verify(`${opts.cookieName}=${raw}`, sig)) {
-    return null;
-  }
-  let session: Record<string, unknown>;
-  try {
-    session = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
-  } catch {
-    return null;
-  }
-  // cookie-session stamps its own expiry into the payload; honour it, since
-  // nothing else will out here.
-  const expire = session._expire;
-  if (typeof expire === "number" && Date.now() > expire) return null;
-  const user = session.user;
-  return user && typeof user === "object" ? (user as SessionUser) : null;
-}
-
-// Validate the post-login redirect. Relative paths always pass; an absolute URL
-// must be THIS origin or one of trustedOrigins; everything else reduces to
-// APP_ROOT, so the login flow can't be used as an open redirect. (Same rule as
-// z0's own safeReturnTarget — single origin means same-origin is the whole
-// allowlist, unless the caller names siblings it shares a cookie with.)
-export function safeReturnTarget(
-  target: string,
-  req: Request,
-  trustedOrigins?: string[],
-): string {
-  if (!target) return APP_ROOT;
-  // A protocol-relative "//evil.example" is absolute to the browser but would
-  // read as a path here, so reject it before anything else.
-  if (target.startsWith("//")) return APP_ROOT;
-  if (target.startsWith("/")) return target;
-  try {
-    const url = new URL(target);
-    if (url.origin === publicOrigin(req)) {
-      return `${url.pathname}${url.search}${url.hash}`;
-    }
-    return trustedOrigins?.includes(url.origin) ? url.toString() : APP_ROOT;
-  } catch {
-    return APP_ROOT;
-  }
-}
-
-// An app whose SPAs don't sit at "/" (labs serves each experiment at
-// /<project>/) passes ?return_to=<here> to /auth/login; it's stashed in the
-// session and honoured by /auth/callback. Absent, everything behaves as before.
+// An SPA not at "/" passes ?return_to=<here> to /auth/login; /auth/callback honours it.
 function requestedReturnTo(req: Request): string {
   const q = req.query.return_to;
   return typeof q === "string" && q !== "" ? q : APP_ROOT;
 }
 
+type SessionBag = Record<string, unknown>;
+
+// The session object, created when a route nulled it earlier in the same request.
+function sessionOf(req: Request): SessionBag {
+  req.session ??= {};
+  return req.session as SessionBag;
+}
+
 export async function setupAuth(
   app: Express,
   opts: AuthOptions,
-): Promise<{ requireAuth: RequestHandler }> {
-  // Resolved through @frediverse/env so these come from the caller's section in
-  // the root env.yaml (and from process.env in a container, where no yaml
-  // exists) — rather than this library reaching into process.env itself.
-  //
-  // COOKIE_DOMAIN/TRUSTED_ORIGINS live in env.yaml's `common` section, so this
-  // same resolution is what makes every service agree on them WITHOUT each
-  // caller having to read and pass them through by hand — which is exactly
-  // what used to go wrong: st0, pl8 and k7 each run their own cookie-session
-  // instance for the SAME "studio.sid", and one of them computing a different
-  // domain (even just "unset" vs the others' "set") makes IT stamp a second,
-  // host-only cookie that shadows the shared one on every response.
+): Promise<AuthHandle> {
+  // From the caller's env.yaml section, so every service sharing a cookie agrees on its domain (docs/session.md).
   const {
     OIDC_ISSUER,
     OIDC_CLIENT_ID,
@@ -308,9 +153,7 @@ export async function setupAuth(
     },
     { service: opts.service },
   );
-  // An explicit option still wins — env.yaml is the common case, not the only
-  // one. `!== undefined` (not `||`) so a caller can pass "" to OPT OUT of the
-  // common section's value entirely — z0 does, being deliberately single-origin.
+  // `!== undefined`, not `||`: an explicit "" opts out of the common section's value.
   const cookieDomain =
     opts.cookieDomain !== undefined
       ? opts.cookieDomain || undefined
@@ -326,6 +169,11 @@ export async function setupAuth(
   const scope = (opts.scopes ?? ["openid", "profile", "email"]).join(" ");
   const mounted = new Set<AuthRoute>(opts.mountRoutes ?? ALL_ROUTES);
   const toUser = opts.mapUser ?? defaultMapUser;
+  const maxAgeMs = opts.sessionMaxAgeMs ?? SESSION_MAX_AGE_MS;
+  const policy: SessionPolicy = {
+    revocations: opts.revocations ?? createSessionRevocations(),
+    groupsMaxAgeMs: opts.groupsMaxAgeMs,
+  };
 
   app.set("trust proxy", 1);
   app.use(
@@ -333,8 +181,21 @@ export async function setupAuth(
       cookieName: opts.cookieName,
       secret: SESSION_SECRET,
       domain: cookieDomain,
+      maxAgeMs,
     }),
   );
+  // A signed but expired, unstamped or revoked session loses its user here, before any route reads it.
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    const session = req.session as SessionBag | null | undefined;
+    if (session?.user && !validSessionUser(session, policy))
+      clearSessionUser(session);
+    next();
+  });
+
+  const startSession: AuthHandle["startSession"] = (req, user, from) =>
+    stampSession(sessionOf(req), user, maxAgeMs, from);
+  const sessionUser = (req: Request): SessionUser | null =>
+    validSessionUser(req.session as SessionBag | null | undefined, policy);
 
   const devMode = !OIDC_ISSUER || !OIDC_CLIENT_ID;
 
@@ -379,12 +240,7 @@ export async function setupAuth(
     );
   }
 
-  // /auth/me and /auth/logout are now called cross-origin (k7.st0.app,
-  // play.st0.app calling the family root) whenever trustedOrigins is set —
-  // and a cross-origin fetch's RESPONSE is invisible to the caller's JS
-  // without these headers, credentials:"include" on the request notwithstanding.
-  // /auth/login and /auth/callback don't need this: they're top-level
-  // navigations, which CORS never governs.
+  // /auth/me and /auth/logout are fetched from trusted sibling origins, whose JS reads the answer only with these.
   if (trustedOrigins?.length) {
     app.use("/auth", (req: Request, res: Response, next: NextFunction) => {
       const origin = req.headers.origin;
@@ -399,21 +255,20 @@ export async function setupAuth(
     });
   }
 
-  // --- Routes ---------------------------------------------------------------
-  // Each is opt-out via opts.mountRoutes, for an app that answers it itself.
+  // --- Routes: each is opt-out via opts.mountRoutes ---
 
   if (mounted.has("login"))
     app.get("/auth/login", async (req: Request, res: Response) => {
-      const session = req.session!;
+      const session = sessionOf(req);
       const return_to = requestedReturnTo(req);
       if (devMode) {
         // The stub carries no groups, so isAdmin() stays false for it.
-        session.user = {
+        startSession(req, {
           sub: "dev-user",
           name: "Dev User",
           email: "dev@example.com",
           groups: [],
-        };
+        });
         return res.redirect(safeReturnTarget(return_to, req, trustedOrigins));
       }
       let client: Client;
@@ -430,9 +285,7 @@ export async function setupAuth(
       const code_verifier = generators.codeVerifier();
       const state = generators.state();
       const nonce = generators.nonce();
-      // return_to rides in the session rather than the redirect_uri: the latter
-      // must match byte-for-byte between login and callback, and the IdP checks
-      // it against its registered list.
+      // return_to rides in the session: the redirect_uri must match the IdP's registered list byte for byte.
       session.oidc = { code_verifier, state, nonce, return_to };
       res.redirect(
         client.authorizationUrl({
@@ -450,19 +303,18 @@ export async function setupAuth(
     app.get("/auth/callback", async (req: Request, res: Response) => {
       if (devMode) return res.redirect(APP_ROOT);
       try {
-        const session = req.session!;
+        const session = sessionOf(req);
         const client = await getClient();
         const params = client.callbackParams(req);
-        const { code_verifier, state, nonce, return_to } = session.oidc || {};
+        const { code_verifier, state, nonce, return_to } = (session.oidc ??
+          {}) as Record<string, string | undefined>;
         const tokenSet = await client.callback(redirectUriFor(req), params, {
           code_verifier,
           state,
           nonce,
         });
         const claims = tokenSet.claims();
-        // The ID token often omits the display name (and some IdPs — authentik
-        // — only put sub+groups in it), while the UserInfo endpoint has them.
-        // Merge it in (best-effort) so we can show a real name.
+        // The ID token often lacks the display name, which UserInfo has: merged in, best-effort.
         let profile: Record<string, unknown> = claims;
         try {
           const info = await client.userinfo(tokenSet);
@@ -470,7 +322,7 @@ export async function setupAuth(
         } catch {
           /* UserInfo is optional — fall back to the ID-token claims */
         }
-        session.user = toUser(profile);
+        startSession(req, toUser(profile));
         delete session.oidc;
         res.redirect(
           safeReturnTarget(return_to ?? APP_ROOT, req, trustedOrigins),
@@ -485,37 +337,48 @@ export async function setupAuth(
 
   if (mounted.has("logout"))
     app.post("/auth/logout", (req: Request, res: Response) => {
-      // Clearing the session object tells cookie-session to expire the cookie.
+      // A cross-site page must not be able to sign anyone out.
+      if (!isSameOriginRequest(req, trustedOrigins))
+        return res.status(403).json({ error: "cross-site request refused" });
+      const user = sessionUser(req);
+      // ?everywhere=1 also kills the copies on every other device.
+      if (req.query.everywhere === "1" && typeof user?.sub === "string")
+        policy.revocations?.revoke(user.sub);
       req.session = null;
       res.json({ ok: true });
     });
 
   if (mounted.has("me"))
     app.get("/auth/me", (req: Request, res: Response) => {
-      // This answer changes the instant the session does (login/logout), on
-      // the SAME URL — Express's default ETag would otherwise let a browser
-      // reuse a cached body across that change via a 304, showing a stale
-      // user (or a stale 401) after the session actually flipped.
+      // Same URL, different answer after a login or logout: never served from a cache.
       res.setHeader("Cache-Control", "no-store");
-      if (!req.session!.user)
-        return res.status(401).json({ error: "unauthenticated" });
-      res.json({ user: req.session!.user });
+      const user = sessionUser(req);
+      if (!user) return res.status(401).json({ error: "unauthenticated" });
+      res.json({ user });
     });
 
-  // --- Middleware -----------------------------------------------------------
-
   const requireAuth: RequestHandler = (req, res, next) => {
-    if (!req.session!.user)
-      return res.status(401).json({ error: "unauthenticated" });
-    req.user = req.session!.user;
+    const user = sessionUser(req);
+    if (!user) return res.status(401).json({ error: "unauthenticated" });
+    // Typed by each app's own augmentation of Request; this package only knows SessionUser.
+    (req as { user?: unknown }).user = user;
     next();
   };
 
-  return { requireAuth };
+  return {
+    requireAuth,
+    startSession,
+    sessionUser,
+    sessionStamps: (req) => {
+      const s = req.session as SessionBag | null | undefined;
+      if (!sessionUser(req) || !s) return null;
+      return { iat: s.iat as number, exp: s.exp as number };
+    },
+    revokeSessions: (sub) => policy.revocations?.revoke(sub),
+  };
 }
 
-// Best display name from OIDC claims/UserInfo, widest-to-narrowest, ending at
-// the opaque subject id only when nothing human-readable is available.
+// Best display name from OIDC claims/UserInfo, ending at the opaque subject id only when nothing else is there.
 function displayName(p: Record<string, unknown>): string {
   const full = [p.given_name, p.family_name].filter(Boolean).join(" ").trim();
   return String(
@@ -523,8 +386,7 @@ function displayName(p: Record<string, unknown>): string {
   );
 }
 
-// The `groups` claim, defensively: IdPs that don't send it omit it entirely,
-// and a misconfigured mapping can send a bare string instead of an array.
+// The `groups` claim, defensively: absent, or a bare string from a misconfigured mapping.
 function groupsOf(p: Record<string, unknown>): string[] {
   const g = p.groups;
   if (Array.isArray(g)) return g.map(String);

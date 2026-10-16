@@ -4,6 +4,7 @@ import type { Request } from "express";
 import express from "express";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  createSessionRevocations,
   isAdmin,
   publicOrigin,
   type SessionUser,
@@ -77,6 +78,23 @@ describe("safeReturnTarget", () => {
     expect(safeReturnTarget("http://[", here)).toBe("/");
   });
 
+  // Each of these is a path to a string test and another host to a browser.
+  it.each([
+    "/\\evil.example",
+    "\\\\evil.example",
+    "\\/evil.example",
+    "/\t/evil.example",
+    "/\n/evil.example",
+    "/.//evil.example",
+    "data:text/html,hi",
+  ])("rejects %j", (target) => {
+    expect(safeReturnTarget(target, here)).toBe("/");
+  });
+
+  it("keeps a same-origin path that merely contains a backslash later on", () => {
+    expect(safeReturnTarget("/a\\b", here)).toBe("/a/b");
+  });
+
   // Multi-origin: a login mounted on one app's origin bouncing back to a sibling's.
   it("rejects a sibling origin when it isn't listed as trusted", () => {
     expect(safeReturnTarget("https://k7.st0.app/pages/1", here)).toBe("/");
@@ -138,12 +156,27 @@ describe("sessionFromCookieHeader", () => {
     const app = express();
     app.use(cookieSession({ name: NAME, keys: [SECRET], maxAge: 60_000 }));
     app.get("/login", (req, res) => {
-      req.session!.user = { sub: "u1", name: "Ada", groups: ["admins"] };
+      const now = Date.now();
+      req.session = {
+        user: { sub: "u1", name: "Ada", groups: ["admins"] },
+        iat: now,
+        exp: now + 60_000,
+      };
       res.json({ ok: true });
     });
     app.get("/expired", (req, res) => {
-      req.session!.user = { sub: "u1" };
-      req.session!._expire = Date.now() - 1000; // already lapsed
+      const now = Date.now();
+      req.session = {
+        user: { sub: "u1" },
+        iat: now,
+        exp: now + 60_000,
+        _expire: now - 1000,
+      };
+      res.json({ ok: true });
+    });
+    // What every session looked like before the stamps: signed, and refused.
+    app.get("/unstamped", (req, res) => {
+      req.session = { user: { sub: "u1" } };
       res.json({ ok: true });
     });
     // Reads the session back through the real middleware, so a cookie we mint
@@ -200,6 +233,27 @@ describe("sessionFromCookieHeader", () => {
         secret: "some-other-secret",
       }),
     ).toBeNull();
+  });
+
+  it("refuses a signed session with no iat/exp stamps", async () => {
+    const header = await cookieHeader("/unstamped");
+    expect(
+      sessionFromCookieHeader(header, { cookieName: NAME, secret: SECRET }),
+    ).toBeNull();
+  });
+
+  it("refuses a session issued before its subject's revocation epoch", () => {
+    const o = { cookieName: NAME, secret: SECRET };
+    const revocations = createSessionRevocations();
+    const header = sessionCookieHeader(
+      { sub: "u1" },
+      { ...o, iat: Date.now() - 1000 },
+    );
+    expect(sessionFromCookieHeader(header, { ...o, revocations })).toEqual({
+      sub: "u1",
+    });
+    revocations.revoke("u1");
+    expect(sessionFromCookieHeader(header, { ...o, revocations })).toBeNull();
   });
 
   it("honours cookie-session's own expiry stamp", async () => {
