@@ -90,6 +90,26 @@ export const Default: Story = {
   },
 };
 
+/** The same menu without a right-click: a ⋮ on each row, and a long-press on a touch screen. */
+export const WithRowMenuButton: Story = {
+  render: () => {
+    const [active, setActive] = useState("travail/lundi");
+    return (
+      <div className="h-96 w-64 border border-border bg-card/40">
+        <FileTree
+          nodes={nodes}
+          activePath={active}
+          reveal={active}
+          actions={actions}
+          cancelLabel="Annuler"
+          rowMenuLabel="Plus d’actions"
+          onOpen={(node) => setActive(node.path)}
+        />
+      </div>
+    );
+  },
+};
+
 /**
  * Both drops at once — a row moved within the tree, and OS files dropped in to upload — which is how lanes
  * uses it. Worth its own story because the two share one set of handlers and the first one added quietly took
