@@ -1,16 +1,30 @@
-// A collapsible file/folder tree with a right-click menu, inline prompts,
-// drag-to-move and OS file drops. Extracted from lanes's sidebar so calepin's
-// note tree is the same widget rather than a lookalike.
+// A collapsible file/folder tree with a right-click menu (or a ⋮ button and a
+// long-press, opt-in), inline prompts, drag-to-move and OS file drops.
+// Extracted from lanes's sidebar so calepin's note tree is the same widget.
 // Everything app-specific is a prop: the menu is a list of TreeAction, the
 // trailing widget a render prop. See packages/ui/docs/file-tree.md.
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, File as FileIcon, Folder, FolderOpen } from "./icons";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { TreeMenu } from "./file-tree-menu";
+import {
+  ChevronRight,
+  EllipsisVertical,
+  File as FileIcon,
+  Folder,
+  FolderOpen,
+} from "./icons";
 import {
   type DroppedFile,
   dropEntries,
   readDroppedFiles,
 } from "./lib/droppedEntries";
+import { useLongPress } from "./lib/longPress";
 import { cn } from "./lib/utils";
 
 export type { DroppedFile };
@@ -148,6 +162,10 @@ interface RowProps<N extends TreeNode> {
   onMove?: (from: string, toDir: string) => void;
   canMove?: (node: N) => boolean;
   onContext: (node: N, e: React.MouseEvent) => void;
+  // Set by `rowMenuLabel`: the ⋮ button's name, and whether this row has anything to offer.
+  menuLabel?: string;
+  hasMenu: (node: N) => boolean;
+  onMenuAt: (node: N, x: number, y: number) => void;
   acceptsFiles: (e: React.DragEvent) => boolean;
   icon?: (node: N, open: boolean) => ReactNode;
   isDisabled?: (node: N) => boolean;
@@ -172,6 +190,9 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
     onMove,
     canMove,
     onContext,
+    menuLabel,
+    hasMenu,
+    onMenuAt,
     acceptsFiles,
     icon,
     isDisabled,
@@ -180,6 +201,30 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
   } = props;
   const pad = { paddingLeft: 8 + depth * 12 };
   const disabled = isDisabled?.(node) ?? false;
+  const withMenu = !!menuLabel && hasMenu(node);
+  const longPress = useLongPress(
+    withMenu ? (x, y) => onMenuAt(node, x, y) : null,
+  );
+  // Shown on hover or focus where a pointer hovers, always where none does.
+  const more = withMenu ? (
+    <button
+      type="button"
+      aria-label={menuLabel}
+      aria-haspopup="menu"
+      onClick={(e) => {
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        onMenuAt(node, r.left, r.bottom);
+      }}
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:h-8 [@media(hover:none)]:w-8 [@media(hover:none)]:opacity-100"
+    >
+      <EllipsisVertical className="h-4 w-4" />
+    </button>
+  ) : null;
+  // No iOS callout or text selection under a held finger, which would bury the menu.
+  const pressable = withMenu
+    ? "group/row select-none [-webkit-touch-callout:none]"
+    : undefined;
 
   // Both drops land on a folder, so one handler decides between them by what the drag carries.
   const dropHandlers = (dir: string) => ({
@@ -248,8 +293,10 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
             opens && activePath === node.path && "bg-secondary",
             dropTarget === node.path &&
               "rounded bg-primary/20 ring-1 ring-inset ring-primary/60",
+            pressable,
           )}
           style={pad}
+          {...longPress}
           onContextMenu={(e) => {
             e.stopPropagation();
             onContext(node, e);
@@ -303,6 +350,7 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
             </button>
           )}
           {rowEnd?.(node)}
+          {more}
         </div>
         {isOpen &&
           node.children?.map((child) => (
@@ -332,7 +380,9 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
         // On the wrapper, not the button: a row with a trailing badge would
         // otherwise be highlighted only up to where the badge starts.
         activePath === node.path && "bg-secondary",
+        pressable,
       )}
+      {...longPress}
     >
       <button
         type="button"
@@ -355,9 +405,10 @@ function Row<N extends TreeNode>(props: RowProps<N>) {
         <span className="w-3.5 shrink-0" />
         {icon?.(node, false) ?? <FileIcon className="h-4 w-4 shrink-0" />}
         <span className="truncate">{node.name}</span>
-              {nameEnd?.(node)}
+        {nameEnd?.(node)}
       </button>
       {rowEnd?.(node)}
+      {more}
     </div>
   );
 }
@@ -419,6 +470,8 @@ export interface FileTreeProps<N extends TreeNode> {
   acceptsFileDrop?: (e: React.DragEvent) => boolean;
   /** The prompts' cancel button — the one string this package can't get from the app's catalogue. */
   cancelLabel?: string;
+  /** Given, a row with actions also shows a ⋮ button named this, and a touch long-press opens its menu. */
+  rowMenuLabel?: string;
   className?: string;
 }
 
@@ -446,6 +499,7 @@ export function FileTree<N extends TreeNode>({
   isDisabled,
   acceptsFileDrop,
   cancelLabel = "Cancel",
+  rowMenuLabel,
   className,
 }: FileTreeProps<N>) {
   const acceptsFiles = acceptsFileDrop ?? defaultAcceptsFiles;
@@ -506,77 +560,54 @@ export function FileTree<N extends TreeNode>({
   const toggle = (path: string) =>
     applyOpen((o) => ({ ...o, [path]: !o[path] }));
 
-  // The open menu: its target, where to draw it, and the action currently prompting.
+  // The open menu: its target and where to draw it; the prompt state lives in TreeMenu.
   const [menu, setMenu] = useState<{
     target: TreeTarget<N>;
     x: number;
     y: number;
   } | null>(null);
-  const [prompting, setPrompting] = useState<TreeAction<N> | null>(null);
-  const [value, setValue] = useState("");
+  const closeMenu = useCallback(() => setMenu(null), []);
 
-  const closeMenu = () => {
-    setMenu(null);
-    setPrompting(null);
-    setValue("");
+  const offers = (target: TreeTarget<N>) =>
+    actions.some((a) => a.when?.(target) ?? true);
+
+  const openAt = (target: TreeTarget<N>, x: number, y: number) => {
+    // Kept on screen: a ⋮ at the right edge of a phone would else push the menu out of it.
+    const left = Math.max(4, Math.min(x, window.innerWidth - 184));
+    setMenu({ target, x: left, y });
   };
-
-  const offered = useMemo(
-    () => (menu ? actions.filter((a) => a.when?.(menu.target) ?? true) : []),
-    [menu, actions],
-  );
 
   const openMenu = (target: TreeTarget<N>, e: React.MouseEvent) => {
     // Never an empty menu — if nothing applies, let the browser's own menu through.
-    if (!actions.some((a) => a.when?.(target) ?? true)) return;
+    if (!offers(target)) return;
     e.preventDefault();
-    setMenu({ target, x: e.clientX, y: e.clientY });
-    setPrompting(null);
-    setValue("");
+    openAt(target, e.clientX, e.clientY);
   };
 
+  const nodeTarget = (node: N): TreeTarget<N> => ({
+    node,
+    path: node.path,
+    name: node.name,
+    dir: !!node.dir,
+    root: false,
+  });
   const onContext = (node: N, e: React.MouseEvent) =>
-    openMenu(
-      { node, path: node.path, name: node.name, dir: !!node.dir, root: false },
-      e,
-    );
-
-  const start = (action: TreeAction<N>) => {
-    if (!menu) return;
-    if (!action.prompt && !action.confirm) {
-      const target = menu.target;
-      closeMenu();
-      action.run(target, "");
-      return;
-    }
-    setValue(action.prompt?.initial?.(menu.target) ?? "");
-    setPrompting(action);
+    openMenu(nodeTarget(node), e);
+  const hasMenu = (node: N) => offers(nodeTarget(node));
+  const onMenuAt = (node: N, x: number, y: number) =>
+    openAt(nodeTarget(node), x, y);
+  const rootTarget: TreeTarget<N> = {
+    node: null,
+    path: rootPath,
+    name: rootLabel ?? rootPath,
+    dir: true,
+    root: true,
   };
-
-  const commit = () => {
-    if (!menu || !prompting) return;
-    const answer = value.trim();
-    const target = menu.target;
-    closeMenu();
-    if (answer) prompting.run(target, answer);
-  };
-
-  const confirmRun = () => {
-    if (!menu || !prompting?.confirm) return;
-    const target = menu.target;
-    closeMenu();
-    prompting.run(target, "");
-  };
-
-  // Dismiss on Escape; an outside click is caught by the backdrop below.
-  useEffect(() => {
-    if (!menu) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeMenu();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [menu]);
+  const backgroundPress = useLongPress(
+    rowMenuLabel && offers(rootTarget)
+      ? (x, y) => openAt(rootTarget, x, y)
+      : null,
+  );
 
   // A lone top-level node is almost always a caller's own wrapping row — draw its children instead.
   const rootNodes: N[] =
@@ -594,19 +625,15 @@ export function FileTree<N extends TreeNode>({
           "ring-2 ring-inset ring-primary/60",
         className,
       )}
+      {...backgroundPress}
+      onPointerDown={(e) => {
+        // A press on a row is that row's long-press, not the background's.
+        if (e.target === e.currentTarget) backgroundPress.onPointerDown?.(e);
+      }}
       onContextMenu={(e) => {
         // The background only: a right-click on a row is that row's, and it stops propagating first.
         if (e.target !== e.currentTarget) return;
-        openMenu(
-          {
-            node: null,
-            path: rootPath,
-            name: rootLabel ?? rootPath,
-            dir: true,
-            root: true,
-          },
-          e,
-        );
+        openMenu(rootTarget, e);
       }}
       onDragEnter={(e) => {
         if (!acceptsFiles(e) && draggedPath(e) === null) return;
@@ -666,6 +693,9 @@ export function FileTree<N extends TreeNode>({
           onMove={onMove}
           canMove={canMove}
           onContext={onContext}
+          menuLabel={rowMenuLabel}
+          hasMenu={hasMenu}
+          onMenuAt={onMenuAt}
           acceptsFiles={acceptsFiles}
           icon={icon}
           isDisabled={isDisabled}
@@ -675,98 +705,14 @@ export function FileTree<N extends TreeNode>({
       ))}
 
       {menu && (
-        <div className="fixed inset-0 z-50" onPointerDown={closeMenu}>
-          <div
-            style={{ left: menu.x, top: menu.y }}
-            className="fixed min-w-[11rem] overflow-hidden rounded-md border border-border bg-popover py-1 text-sm shadow-md"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            {prompting?.prompt ? (
-              <div className="px-2 py-1">
-                {prompting.prompt.hint && (
-                  <div className="mb-1 text-xs text-muted-foreground">
-                    {prompting.prompt.hint(menu.target, value)}
-                  </div>
-                )}
-                <input
-                  // biome-ignore lint/a11y/noAutofocus: the prompt IS the menu now — a field you must click first is a menu that swallowed your click.
-                  autoFocus
-                  placeholder={prompting.prompt.placeholder}
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commit();
-                    else if (e.key === "Escape") closeMenu();
-                  }}
-                  className="w-full rounded border border-border bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-                <div className="mt-1 flex justify-end gap-1">
-                  <button
-                    type="button"
-                    onClick={closeMenu}
-                    className="rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    {cancelLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={commit}
-                    className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground"
-                  >
-                    {prompting.prompt.submit}
-                  </button>
-                </div>
-              </div>
-            ) : prompting?.confirm ? (
-              <div className="px-2 py-1">
-                <div className="mb-1 text-xs text-muted-foreground">
-                  {prompting.confirm.message(menu.target)}
-                </div>
-                <div className="mt-1 flex justify-end gap-1">
-                  <button
-                    type="button"
-                    onClick={closeMenu}
-                    className="rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    {cancelLabel}
-                  </button>
-                  <button
-                    type="button"
-                    // biome-ignore lint/a11y/noAutofocus: the prompt IS the menu now — a button you must click first is a menu that swallowed your click.
-                    autoFocus
-                    onClick={confirmRun}
-                    className={cn(
-                      "rounded px-2 py-0.5 text-xs",
-                      prompting.danger
-                        ? "bg-destructive text-destructive-foreground"
-                        : "bg-primary text-primary-foreground",
-                    )}
-                  >
-                    {prompting.confirm.submit}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              offered.map((action) => (
-                <button
-                  key={action.key}
-                  type="button"
-                  onClick={() => start(action)}
-                  className={cn(
-                    "block w-full px-3 py-1 text-left hover:bg-accent",
-                    action.danger
-                      ? "text-destructive"
-                      : "hover:text-accent-foreground",
-                  )}
-                >
-                  {typeof action.label === "function"
-                    ? action.label(menu.target)
-                    : action.label}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        <TreeMenu
+          target={menu.target}
+          x={menu.x}
+          y={menu.y}
+          actions={actions}
+          cancelLabel={cancelLabel}
+          onClose={closeMenu}
+        />
       )}
     </div>
   );
