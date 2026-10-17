@@ -15,17 +15,49 @@
 import type { Request, RequestHandler, Response } from "express";
 import type { ZodType } from "zod";
 
-/** Wrap an async route so thrown errors become a 500 JSON response. */
+/** An error whose message is meant for the client: `wrap` answers it with its 4xx status. */
+export class HttpError extends Error {
+  readonly status: number;
+  readonly expose = true;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
+/** The 4xx of an error that says its message may be shown (`expose`, as http-errors does), or undefined. */
+function exposedStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const { status, statusCode, expose } = err as Record<string, unknown>;
+  const code = typeof status === "number" ? status : statusCode;
+  return expose === true &&
+    typeof code === "number" &&
+    code >= 400 &&
+    code < 500
+    ? code
+    : undefined;
+}
+
+/** Wrap an async route: an exposed 4xx keeps its message, anything else is logged and answers a generic 500. */
 export const wrap =
   (fn: (req: Request, res: Response) => unknown): RequestHandler =>
   async (req, res) => {
     try {
       await fn(req, res);
     } catch (err) {
-      console.error(err);
+      const status = exposedStatus(err);
+      // The route's pattern, not the URL: a public route carries its credential in the path.
+      if (!status)
+        console.error(
+          `${req.method} ${req.baseUrl}${req.route?.path ?? ""} failed:`,
+          err,
+        );
       // A handler that failed AFTER answering cannot be answered again, and trying throws out of this catch as an unhandled rejection.
       if (res.headersSent) res.destroy();
-      else res.status(500).json({ error: (err as Error).message });
+      else if (status)
+        res.status(status).json({ error: (err as Error).message });
+      else res.status(500).json({ error: "internal error" });
     }
   };
 

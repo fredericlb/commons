@@ -6,7 +6,7 @@
 export { type AuthUser, sub } from "./express.ts";
 export { publicOrigin, redirectUriFor } from "./origin.ts";
 export { ownerGuard } from "./ownership.ts";
-export { validate, wrap } from "./route.ts";
+export { HttpError, validate, wrap } from "./route.ts";
 export {
   DEFAULT_CACHE_CONTROL,
   etagListed,
