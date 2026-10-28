@@ -126,35 +126,6 @@ function bareBaseRedirect(prefix: string): Plugin {
   };
 }
 
-/** The house faces, linked in every app's page from here: Rubik 80s Fade for titles, Sansation for the rest (@frediverse/ui's theme.css). */
-export const BRAND_FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Sansation:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Rubik+80s+Fade&display=swap";
-
-const brandFonts: Plugin = {
-  name: "commons:brand-fonts",
-  transformIndexHtml: () => [
-    {
-      tag: "link",
-      attrs: { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      injectTo: "head",
-    },
-    {
-      tag: "link",
-      attrs: {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
-        crossorigin: "",
-      },
-      injectTo: "head",
-    },
-    {
-      tag: "link",
-      attrs: { rel: "stylesheet", href: BRAND_FONTS_URL },
-      injectTo: "head",
-    },
-  ],
-};
-
 export function defineAppConfig(options: AppConfigOptions): UserConfig {
   const dir = options.dir.startsWith("file:")
     ? path.dirname(fileURLToPath(options.dir))
@@ -227,7 +198,6 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
       ...(prefix ? [bareBaseRedirect(prefix)] : []),
       react(),
       tailwindcss(),
-      brandFonts,
       upgradeSocketGuard,
       // A .gz and a .br beside every text asset, which the server sends as they are (docs/compression.md).
       compression(),

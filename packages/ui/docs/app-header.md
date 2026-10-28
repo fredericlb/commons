@@ -16,14 +16,18 @@ without each of them re-deciding it.
   background. Both kept for an app with a reason; none has one today.
 
 The **name** is set in the brand face, `font-brand` — Rubik 80s Fade, a
-striped display font from Google Fonts, always in white. The same face sets
+striped display font, always in white. The same face sets
 the sign-in wordmark; headings (`h1`–`h6`) and `CardTitle` stay in the body
 face, Sansation. It has a single weight, and a browser-faked bold fills its stripes in, so
 `theme.css` turns weight synthesis off (`font-synthesis-weight: none`) on
-`:root`. The token lives in `theme.css` with Sansation as fallback; the
-stylesheet link is injected into every app's page by `@frediverse/vite-config`
-(`defineAppConfig`), so an app links nothing itself. It is for titles and
-nothing else.
+`:root`. The token lives in `theme.css` with Sansation as fallback, and so do
+the faces themselves: `theme.css` imports both from Fontsource, so an app that
+imports the theme links nothing itself. It is for titles and nothing else.
+
+The faces ship in each app's own files rather than being linked from Google
+Fonts: a stylesheet from another host blocks the page's first paint and every
+script after it until that host answers, which on a phone on a slow network is
+seconds of a waiting page, even when the studio runs on the phone itself.
 
 `contained` caps and centres the bar's content at `max-w-3xl`, for an app whose
 page is a centred column and wants the bar aligned with it. The phare apps

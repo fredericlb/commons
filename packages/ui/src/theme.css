@@ -6,6 +6,15 @@
    with any legacy --accent / --muted / --border an app may already define.
    The theme is dark-only, so the tokens live straight on :root. */
 
+/* The house faces, shipped in the app's own files: a stylesheet linked from another host blocks the page until it answers. */
+@import "@fontsource/sansation/300.css";
+@import "@fontsource/sansation/300-italic.css";
+@import "@fontsource/sansation/400.css";
+@import "@fontsource/sansation/400-italic.css";
+@import "@fontsource/sansation/700.css";
+@import "@fontsource/sansation/700-italic.css";
+@import "@fontsource/rubik-80s-fade/400.css";
+
 :root {
   --sh-background: #101114;
   --sh-foreground: #e9e9ee;
@@ -34,8 +43,8 @@
 }
 
 /* Frediverse type: Rubik 80s Fade for titles (--font-brand), Sansation
-   for everything else (--font-sans, --font-display; 300, 400, 700). Both come
-   from Google Fonts, linked by @frediverse/vite-config's defineAppConfig.
+   for everything else (--font-sans, --font-display; 300, 400, 700). Both are
+   Fontsource packages, imported at the top of this file.
    An app with its own identity (acu's Noto/CJK, z0's Press Start 2P)
    overrides these in its own stylesheet. */
 /* `static` so both vars are always emitted: Tailwind tree-shakes unused theme
@@ -46,8 +55,8 @@
   --font-sans: "Sansation", system-ui, sans-serif;
   --font-display: "Sansation", system-ui, sans-serif;
   /* Titles — the app name in AppHeader and the sign-in wordmark: Rubik 80s
-     Fade, in white. h1–h6 and CardTitle stay in the body face. Without its
-     link the titles fall back to the body face. Never for body copy. */
+     Fade, in white. h1–h6 and CardTitle stay in the body face. Until its
+     file arrives the titles fall back to the body face. Never for body copy. */
   --font-brand: "Rubik 80s Fade", "Sansation", system-ui, sans-serif;
 }
 
