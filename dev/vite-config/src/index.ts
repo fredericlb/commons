@@ -239,9 +239,13 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
                       runtimeCaching: [
                         {
                           urlPattern: navigationMatcher(options.pwaDenylist),
-                          handler: "NetworkOnly" as const,
+                          // NetworkFirst, Workbox allowing a timeout on no other; its cache keeps 200s only, never a redirect.
+                          handler: "NetworkFirst" as const,
                           options: {
+                            cacheName: "shell",
                             networkTimeoutSeconds: SHELL_TIMEOUT_S,
+                            cacheableResponse: { statuses: [200] },
+                            expiration: { maxEntries: 16 },
                             // Relative, so it resolves against the worker's scope under any `base`.
                             precacheFallback: { fallbackURL: "index.html" },
                           },

@@ -52,8 +52,11 @@ browser enforces — **check it first** if a neighbouring app ever serves the ro
 
 ## The shell comes from the network, the assets from the precache
 
-In a build, a navigation asks the **network** for `index.html` (`NetworkOnly`), and the precached
-shell answers only when the network does not: offline, or past `SHELL_TIMEOUT_S`. Everything the
+In a build, a navigation asks the **network** for `index.html`, and a shell from disk answers only
+when the network does not: offline, or past `SHELL_TIMEOUT_S` — the one last fetched for that
+address, else the precached one. The handler is `NetworkFirst` because Workbox allows a timeout on no
+other, and its cache keeps a 200 only: a navigation can answer a redirect, and replaying one is a
+login loop. Everything the
 shell then loads is hashed, so it comes from the precache when the worker has it and from the server
 when it does not.
 
