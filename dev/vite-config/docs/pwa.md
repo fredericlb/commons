@@ -71,6 +71,10 @@ and that costs twice:
   new server, and a reload brings back the same old shell. Only a hard reload, which skips the
   worker, gets past it.
 
+`directoryIndex: null` belongs to the same choice: by default the precache route reads `/` as
+`index.html` and answers it from disk before any other route is asked, so the app's own root
+address would still start on the previous build.
+
 The page is one small request, so asking the network for it costs a round trip where the precache
 cost nothing, and that is the price of starting on the build that is deployed. A matcher spells
 `pwaDenylist` into its own source, since Workbox copies the function's text into the worker. In dev

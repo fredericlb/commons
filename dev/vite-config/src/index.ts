@@ -236,6 +236,8 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
                 ...(IS_BUILD
                   ? {
                       navigateFallback: null,
+                      // Or the precache answers `/` itself, as `index.html`, before the route below is asked.
+                      directoryIndex: null,
                       runtimeCaching: [
                         {
                           urlPattern: navigationMatcher(options.pwaDenylist),
