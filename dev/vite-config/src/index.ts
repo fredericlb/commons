@@ -74,9 +74,21 @@ export interface AppConfigOptions {
 
 /**
  * Building, rather than serving — read off the CLI because this returns a plain object and there
- * is no `({ command })` to close over. It gates one thing: `clientsClaim`.
+ * is no `({ command })` to close over. It gates `clientsClaim` and how a navigation is answered.
  */
 const IS_BUILD = process.argv.includes("build");
+
+/** How long a navigation waits for the network before the precached shell answers it (docs/pwa.md). */
+const SHELL_TIMEOUT_S = 5;
+
+/** This app's navigations, spelled into the matcher's source: Workbox copies the function's text into the worker, so nothing can be closed over. */
+function navigationMatcher(denylist: RegExp[] = []) {
+  const deny = `[${denylist.map(String).join(", ")}]`;
+  return new Function(
+    "ctx",
+    `return ctx.request.mode === "navigate" && !${deny}.some((r) => r.test(ctx.url.pathname));`,
+  ) as (ctx: { request: Request; url: URL }) => boolean;
+}
 
 /**
  * A socket that resets must not take the dev server with it. An `upgrade` whose URL matches no
@@ -218,13 +230,30 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
                 globPatterns: [
                   "**/*.{js,css,html,ico,png,svg,webmanifest,woff2}",
                 ],
-                // An SPA route has no file behind it, so a navigation gets the shell. Relative,
-                // so it resolves against the worker's own scope and an app under a `base` needs
-                // no special case.
-                navigateFallback: "index.html",
-                ...(options.pwaDenylist
-                  ? { navigateFallbackDenylist: options.pwaDenylist }
-                  : {}),
+                // A navigation asks the NETWORK for the shell, the precached one answering only offline
+                // or past the timeout: a shell from cache is the previous deploy's (docs/pwa.md).
+                // In dev nothing is precached but the fallback, so it keeps Workbox's own route.
+                ...(IS_BUILD
+                  ? {
+                      navigateFallback: null,
+                      runtimeCaching: [
+                        {
+                          urlPattern: navigationMatcher(options.pwaDenylist),
+                          handler: "NetworkOnly" as const,
+                          options: {
+                            networkTimeoutSeconds: SHELL_TIMEOUT_S,
+                            // Relative, so it resolves against the worker's scope under any `base`.
+                            precacheFallback: { fallbackURL: "index.html" },
+                          },
+                        },
+                      ],
+                    }
+                  : {
+                      navigateFallback: "index.html",
+                      ...(options.pwaDenylist
+                        ? { navigateFallbackDenylist: options.pwaDenylist }
+                        : {}),
+                    }),
                 cleanupOutdatedCaches: true,
                 // Claim open pages in DEV only. A browser offers to install an app once a worker
                 // CONTROLS the page; without this the affordance waits for a second navigation,

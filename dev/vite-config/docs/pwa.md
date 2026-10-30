@@ -1,8 +1,8 @@
 # The service worker every app gets
 
 `defineAppConfig` adds `vite-plugin-pwa` to every frediverse app. What it buys is a **second
-opening** — the shell and its assets are precached, so the app starts from disk instead of
-downloading its bundle again — and **installability**: with no worker, no browser offers to add
+opening** — the assets are precached, so the app starts from disk instead of downloading its
+bundle again, the page itself being one small request — and **installability**: with no worker, no browser offers to add
 the app to a home screen.
 
 It does not buy offline, and that is not an oversight. These apps read their state from a backend;
@@ -50,6 +50,29 @@ pwaDenylist: [/^\/(pl8|k7|z0|api|auth)(\/|$)/],
 It is the same table as the image's `nginx.conf`. Two copies of one fact, and this is the one a
 browser enforces — **check it first** if a neighbouring app ever serves the root app's shell.
 
+## The shell comes from the network, the assets from the precache
+
+In a build, a navigation asks the **network** for `index.html` (`NetworkOnly`), and the precached
+shell answers only when the network does not: offline, or past `SHELL_TIMEOUT_S`. Everything the
+shell then loads is hashed, so it comes from the precache when the worker has it and from the server
+when it does not.
+
+Answering navigations from the precache instead — Workbox's `navigateFallback` — starts every
+opening on the build the INSTALLED worker holds, which after a deploy is the previous one. The new
+build reaches the page only once the new worker has downloaded the whole precache and taken over,
+and that costs twice:
+
+- every start after a deploy runs the old build, then reloads onto the new one a few seconds later
+  — on a phone, the time the precache takes to download;
+- a precache that takes longer than the startup window leaves the old build running against the
+  new server, and a reload brings back the same old shell. Only a hard reload, which skips the
+  worker, gets past it.
+
+The page is one small request, so asking the network for it costs a round trip where the precache
+cost nothing, and that is the price of starting on the build that is deployed. A matcher spells
+`pwaDenylist` into its own source, since Workbox copies the function's text into the worker. In dev
+the precache is empty but for the fallback, so dev keeps `navigateFallback`, limited to `/` there.
+
 ## Every deploy reaches every open tab
 
 A tab is left open for days, and a tab still running a bundle from before a protocol change talks to
@@ -64,6 +87,9 @@ lazily loaded chunk is a hashed file that no longer exists. So the preset keeps
 
 - it tells the waiting worker to take over, and **every tab it controlled reloads** onto the new
   bundle. A reload is the whole page, so no old shell is left asking for chunks;
+- **except a tab that already runs the new build** — its shell came from the network. Its hashed
+  entry script is named in the waiting worker's precache manifest (`sw.js`), so the swap is silent:
+  reloading it would only start again what is on screen;
 - **when**: an update found at startup applies at once, nothing having been done in the tab yet;
   one found later — a tab asks every half hour, navigations ask on their own — waits until that tab
   is hidden, so a deploy never reloads a page under someone's hands;
