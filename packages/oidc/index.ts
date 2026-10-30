@@ -15,7 +15,7 @@ import type {
   RequestHandler,
   Response,
 } from "express";
-import { type Client, generators, Issuer } from "openid-client";
+import type { Client } from "openid-client";
 import {
   APP_ROOT,
   isSameOriginRequest,
@@ -64,6 +64,9 @@ export { publicOrigin, redirectUriFor };
 export type AuthRoute = "login" | "callback" | "logout" | "me";
 
 const ALL_ROUTES: AuthRoute[] = ["login", "callback", "logout", "me"];
+
+/** How long after setup the discovery is warmed: past a start, which it would otherwise share the CPU with. */
+const WARM_DELAY_MS = 5_000;
 
 export interface AuthOptions {
   /** Name of the session cookie (unique per app, e.g. "songs.sid"). */
@@ -199,13 +202,21 @@ export async function setupAuth(
 
   const devMode = !OIDC_ISSUER || !OIDC_CLIENT_ID;
 
+  // Loaded on first use: its evaluation is a cost every start pays for a login most starts never see (docs/discovery.md).
+  let library: Promise<typeof import("openid-client")> | null = null;
+  const openid = () => {
+    library ??= import("openid-client");
+    return library;
+  };
   // Discovered on first use and never awaited at boot, so an unreachable IdP costs a login, not the server (docs/discovery.md).
   let discovery: Promise<Client> | null = null;
   const getClient = (): Promise<Client> => {
     const clientId = OIDC_CLIENT_ID;
     if (!OIDC_ISSUER || !clientId)
       return Promise.reject(new Error("OIDC is not configured"));
-    discovery ??= Issuer.discover(OIDC_ISSUER).then(
+    discovery ??= openid()
+      .then(({ Issuer }) => Issuer.discover(OIDC_ISSUER))
+      .then(
       (issuer) => {
         console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
         return new issuer.Client({
@@ -232,12 +243,16 @@ export async function setupAuth(
         "    Set OIDC_ISSUER / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET for real auth.",
     );
   } else if (mounted.has("login") || mounted.has("callback")) {
-    // Warmed now so the first login does not wait for it; a failure here is only a log line.
-    getClient().catch((err: Error) =>
-      console.warn(
-        `⚠️  OIDC discovery failed (${err.message}) — retried on the next login`,
-      ),
-    );
+    // Warmed once the start is over, so the first login does not wait for it; a failure here is only a log line.
+    setTimeout(
+      () =>
+        getClient().catch((err: Error) =>
+          console.warn(
+            `⚠️  OIDC discovery failed (${err.message}) — retried on the next login`,
+          ),
+        ),
+      WARM_DELAY_MS,
+    ).unref();
   }
 
   // /auth/me and /auth/logout are fetched from trusted sibling origins, whose JS reads the answer only with these.
@@ -282,6 +297,7 @@ export async function setupAuth(
             "The sign-in service cannot be reached. <a href='/auth/login'>Try again</a>",
           );
       }
+      const { generators } = await openid();
       const code_verifier = generators.codeVerifier();
       const state = generators.state();
       const nonce = generators.nonce();

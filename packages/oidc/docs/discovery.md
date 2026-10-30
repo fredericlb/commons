@@ -17,7 +17,10 @@ login asks again. A service that mounts neither route never fetches it at all.
 
 ## What a reader gets wrong
 
-- **Boot still tries.** When the routes are mounted, discovery starts at boot without being
-  awaited, so the first login does not pay for it. A failure there is a warning in the log.
+- **Boot still tries, five seconds in.** When the routes are mounted, discovery starts five
+  seconds after `setupAuth`, without being awaited, so the first login does not pay for it. A
+  failure there is a warning in the log. Not at once: a phone's start is the moment it would slow.
+- **`openid-client` itself loads on first use.** Its evaluation is paid by every start, and on a
+  machine's own backend most starts never sign anyone in.
 - **An unreachable IdP is a 503 on `/auth/login`**, with a link to try again. It is not a 401:
   nothing is wrong with the person's credentials.
