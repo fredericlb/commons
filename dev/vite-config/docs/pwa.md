@@ -92,19 +92,66 @@ takes over a tab that keeps RUNNING the old shell, while the precache is the new
 lazily loaded chunk is a hashed file that no longer exists. So the preset keeps
 `registerType: "prompt"` — the new worker waits — and `register.ts` makes the swap whole:
 
-- it tells the waiting worker to take over, and **every tab it controlled reloads** onto the new
+- it tells the waiting worker to take over, and **every page of the scope reloads** onto the new
   bundle. A reload is the whole page, so no old shell is left asking for chunks;
 - **except a tab that already runs the new build** — its shell came from the network. Its hashed
   entry script is named in the waiting worker's precache manifest (`sw.js`), so the swap is silent:
-  reloading it would only start again what is on screen;
+  reloading it would only start again what is on screen. Such a tab never holds the swap either,
+  since it costs that tab nothing;
+- **the swap is everyone's decision**, because it reloads every page at once — tabs, and on Android
+  the separate WebViews of k7, the médiathèque and the recorder, which share one worker. Before
+  telling the worker, a page asks the others over a `BroadcastChannel`; any page **in use** answers
+  "hold", and the swap waits. In use means visible past its first ten seconds, or marked busy by
+  the app (below). A page that held says "free" once it is hidden and idle, and whoever has an
+  update pending asks again. The rules are `src/updateGate.ts`, without a DOM so they are tested;
 - **when**: an update found at startup applies at once, nothing having been done in the tab yet;
-  one found later — a tab asks every half hour, navigations ask on their own — waits until that tab
-  is hidden, so a deploy never reloads a page under someone's hands;
-- any OTHER tab reloads the moment the new worker takes over, visible or not: left running, it
-  would be the old shell over the new precache.
+  one found later — a tab asks every half hour, navigations ask on their own — waits until no page
+  is in use, so a deploy never reloads a page under someone's hands;
+- a page the new worker takes over anyway — a race with the question, a browser without
+  `BroadcastChannel` — reloads at once if free, and otherwise at its next moment free.
+
+**Busy.** Visibility is not enough for an app that plays or records: a set playing in a hidden
+tab, a take recording with the screen off. Such an app marks itself:
+
+```ts
+import { setUpdateBusy } from "@frediverse/vite-config/register";
+
+setUpdateBusy(playing || recording);
+```
+
+called whenever that state changes. A busy page holds the swap even hidden, and never reloads.
+
+**The trade-off.** A page that defers its reload runs the old shell under the new worker, whose
+precache is the new build's: the next lazy chunk it asks for no longer exists. The app's
+missing-chunk handler (k7's `chunkReload.ts`) reloads it once at that moment,
+busy or not. That window only opens on a race, and the reload then comes from a click that opened
+something, not from a deploy landing in the middle of a song. An app with no such handler shows its
+pane's error instead.
 
 What a hidden reload costs is the app's in-memory state. An app that holds work only in memory
-must save it before it can afford this.
+must save it before it can afford this, or stay busy while it holds it.
+
+## Registered once the page is idle
+
+`registerWorker` registers after `load`, in an idle moment: installing a worker downloads the whole
+precache, and on a first visit over mobile data that competes with the first screen's own chunks.
+The second opening is what the worker buys, so the first one owes it nothing.
+
+## `pwaPrecacheIgnore`: heavy files few sessions open
+
+The precache downloads everything the build emits, at every first start and every deploy. An app
+with heavy chunks that most sessions never load passes their globs (relative to the build folder):
+
+```ts
+pwaPrecacheIgnore: ["assets/verovio-module-*.js", "assets/*-cyrillic*"],
+```
+
+What it buys is the install's weight; what it costs is that a left-out file is fetched from the
+network the first time it is used. A hashed file under `assets/` is then kept by a `CacheFirst`
+runtime route (a hashed name never changes content, so the first copy is the last), capped at 40
+entries; an unhashed one rests on the HTTP cache. The list is the app's, since only the app knows
+which of its screens are rare — k7's is `RARELY_USED` in its `vite.config.ts`. Both apply to a build
+only, the dev worker precaching nothing; the route sits after the shell's, which only navigations match.
 
 ## `clientsClaim` in dev only
 

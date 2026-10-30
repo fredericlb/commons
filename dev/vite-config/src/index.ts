@@ -66,6 +66,8 @@ export interface AppConfigOptions {
    * app at `/` controls the whole origin, its neighbours included. See docs/pwa.md.
    */
   pwaDenylist?: RegExp[];
+  /** Built files kept OUT of the precache (globs from the build folder), for heavy ones few sessions use: a hashed one under `assets/` is cached on first use instead. See docs/pwa.md. */
+  pwaPrecacheIgnore?: string[];
   /** No service worker for this app. See docs/pwa.md for when that is the right answer. */
   pwa?: false;
   /** App-specific config, merged over the preset. */
@@ -136,6 +138,12 @@ function bareBaseRedirect(prefix: string): Plugin {
       });
     },
   };
+}
+
+/** The app's hashed build files, matched on the whole URL as Workbox does: `<origin><prefix>/assets/…`. */
+function assetsPattern(prefix: string): RegExp {
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^https?://[^/]+${escaped}/assets/`);
 }
 
 export function defineAppConfig(options: AppConfigOptions): UserConfig {
@@ -238,6 +246,14 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
                       navigateFallback: null,
                       // Or the precache answers `/` itself, as `index.html`, before the route below is asked.
                       directoryIndex: null,
+                      ...(options.pwaPrecacheIgnore
+                        ? {
+                            globIgnores: [
+                              "**/node_modules/**/*",
+                              ...options.pwaPrecacheIgnore,
+                            ],
+                          }
+                        : {}),
                       runtimeCaching: [
                         {
                           urlPattern: navigationMatcher(options.pwaDenylist),
@@ -252,6 +268,20 @@ export function defineAppConfig(options: AppConfigOptions): UserConfig {
                             precacheFallback: { fallbackURL: "index.html" },
                           },
                         },
+                        // What the precache leaves out is kept on first use: a hashed file never changes.
+                        ...(options.pwaPrecacheIgnore
+                          ? [
+                              {
+                                urlPattern: assetsPattern(prefix),
+                                handler: "CacheFirst" as const,
+                                options: {
+                                  cacheName: "hashed-assets",
+                                  expiration: { maxEntries: 40 },
+                                  cacheableResponse: { statuses: [200] },
+                                },
+                              },
+                            ]
+                          : []),
                       ],
                     }
                   : {

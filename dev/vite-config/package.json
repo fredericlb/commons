@@ -9,7 +9,8 @@
     "./register": "./src/register.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
