@@ -7,24 +7,29 @@ import { cn } from "./lib/utils";
 // selected day is filled and today outlined in the primary. Month navigation is
 // internal by default (view follows `selected`), or controlled via `month`/`onMonthChange`.
 // `disableFuture` stops both navigation and picking past today, for a log of what happened.
-//
+// Month, weekday and day names come from Intl in `locale`; only the two arrows' names are `labels`.
 // Day keys are "YYYY-M-D" (month 0-indexed, no padding) — use `dayKey(date)`.
 
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+/** The arrows' accessible names, which Intl cannot word; English unless the app passes its own. */
+export interface CalendarLabels {
+  previousMonth: string;
+  nextMonth: string;
+}
+const LABELS_EN: CalendarLabels = {
+  previousMonth: "Previous month",
+  nextMonth: "Next month",
+};
+
+// Monday-start short weekday names; 2024-01-01 was a Monday.
+const weekdays = (locale: string) =>
+  Array.from({ length: 7 }, (_, i) =>
+    new Date(2024, 0, 1 + i).toLocaleDateString(locale, { weekday: "short" }),
+  );
+// A heading starts with a capital even where the month's name does not ("octobre 2026").
+const monthTitle = (d: Date, locale: string) => {
+  const s = d.toLocaleDateString(locale, { month: "long", year: "numeric" });
+  return s.charAt(0).toLocaleUpperCase(locale) + s.slice(1);
+};
 
 /** Build the "YYYY-M-D" key a Calendar uses from a Date. */
 export const dayKey = (d: Date) =>
@@ -51,6 +56,9 @@ interface CalendarProps {
   onMonthChange?: (month: string) => void;
   /** No month after this one and no day after today: for a calendar of things already done. */
   disableFuture?: boolean;
+  /** The language the month and days are named in (a BCP 47 tag); English by default. */
+  locale?: string;
+  labels?: CalendarLabels;
   className?: string;
 }
 
@@ -61,6 +69,8 @@ export function Calendar({
   month,
   onMonthChange,
   disableFuture = false,
+  locale = "en",
+  labels = LABELS_EN,
   className,
 }: CalendarProps) {
   const controlled = month != null;
@@ -116,12 +126,12 @@ export function Calendar({
           size="sm"
           data-slot="calendar-nav"
           onClick={() => changeMonth(-1)}
-          aria-label="Previous month"
+          aria-label={labels.previousMonth}
         >
           <ChevronLeft className="size-4" />
         </Button>
         <span className="text-[13.5px] font-semibold">
-          {MONTHS[mon]} {year}
+          {monthTitle(view, locale)}
         </span>
         <Button
           variant="outline"
@@ -129,14 +139,14 @@ export function Calendar({
           data-slot="calendar-nav"
           disabled={disableFuture && atCurrentMonth}
           onClick={() => changeMonth(1)}
-          aria-label="Next month"
+          aria-label={labels.nextMonth}
         >
           <ChevronRight className="size-4" />
         </Button>
       </div>
 
       <div className="grid grid-cols-7 gap-0.5">
-        {WEEKDAYS.map((w) => (
+        {weekdays(locale).map((w) => (
           <span
             key={w}
             className="pb-1 text-center text-[10px] text-muted-foreground"
@@ -158,6 +168,10 @@ export function Calendar({
               key={key}
               data-slot="calendar-day"
               disabled={isFuture}
+              aria-label={new Date(year, mon, d).toLocaleDateString(locale, {
+                dateStyle: "full",
+              })}
+              aria-pressed={isSel}
               onClick={() => onSelect(key)}
               className={cn(
                 "relative flex aspect-square items-center justify-center rounded-md border border-transparent text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-30",
