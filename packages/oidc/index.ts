@@ -311,6 +311,8 @@ export async function setupAuth(
           code_challenge_method: "S256",
           state,
           nonce,
+          // `?prompt=login` asks the provider for its sign-in page even when it holds a session: choosing another account.
+          ...(req.query.prompt === "login" ? { prompt: "login" } : {}),
         }),
       );
     });

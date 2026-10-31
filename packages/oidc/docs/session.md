@@ -64,3 +64,9 @@ second, host-only cookie that shadows the shared one; that is why it resolves fr
 it only when it lands on this origin or a trusted one. Matching text instead fails on targets such
 as `/\evil.com`, which the redirect leaves untouched and the browser reads as `//evil.com`. Control
 characters, a leading pair of slashes or backslashes, and a path that resolves to `//…` are refused.
+
+## Choosing another account at sign-in
+
+`/auth/login?prompt=login` passes `prompt=login` to the provider, which then shows its sign-in page
+even while it holds a session of its own. Without it, an app that signs a person out to let them pick
+another account gets the same account straight back from the provider's session.
