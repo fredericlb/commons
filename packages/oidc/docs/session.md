@@ -26,8 +26,8 @@ signed out.
 - **`sessionMaxAgeMs`, 7 days by default**, from the sign-in, not from the last request. It is also
   the cookie's `maxAge`.
 - **`groupsMaxAgeMs`, 12 hours by default**, for a session that carries at least one group. Groups
-  come from the IdP at sign-in and nowhere else: the flow keeps no refresh token, so the only way to
-  read them again is a new sign-in. A session with groups therefore ends after 12 hours, and a group
+  come from the IdP at sign-in and nowhere else: the session's user is never read again (a kept
+  refresh token, below, renews the access token only), so the only way to read them again is a new sign-in. A session with groups therefore ends after 12 hours, and a group
   removed at the IdP stops counting within that bound. A session with no groups has nothing to lose
   that way, and lives its full 7 days.
 
@@ -70,3 +70,31 @@ characters, a leading pair of slashes or backslashes, and a path that resolves t
 `/auth/login?prompt=login` passes `prompt=login` to the provider, which then shows its sign-in page
 even while it holds a session of its own. Without it, an app that signs a person out to let them pick
 another account gets the same account straight back from the provider's session.
+
+## Keeping the provider's token
+
+`keepAccessToken` (default off) keeps the provider's access token of each sign-in, for an app that
+must later prove the person to a third party on the same provider — an app on the person's machine
+pairing itself with a server, say (`accessToken(req)`). It is never sent to the browser, and never written:
+
+- **Not in the cookie.** The cookie is signed, not encrypted: its payload is readable by whoever
+  holds it, and it lives a week where the token lives an hour. The cookie carries an opaque random
+  key; the token sits in this process's memory under that key (`providerTokens.ts`), bounded in
+  number, and dies with the process. A restart costs the token, not the session: `accessToken`
+  answers null and the app falls back to whatever it did without one.
+- **Bound to the subject it was kept for**, and to the session's own end. A session whose user changed
+  (the local user signing in, a handoff into another account) holds a key to nothing; a session
+  refused by its stamps or its revocation epoch gets null, since `accessToken` reads only a valid one.
+  A logout forgets it.
+- **A handoff carries the key, not the token.** `sessionStamps` names the key (`kept`) and
+  `startSession(req, user, from)` gives it to the new session, so an app's view signed in from the
+  system browser shares that browser session's token. The key opens nothing without a session cookie
+  signed by this process.
+- **`keepRefreshToken`** keeps the refresh token too, when the provider hands one (most only do for
+  the `offline_access` scope, which the app adds to its scopes and the provider's client must allow).
+  An expired access token is then renewed on its next read; without one, an expired token is null.
+
+`userinfoFor(token)` and `introspect(token)` are the other side: a server asked to trust a token a
+caller presents asks its own provider about it, never the provider the caller names. `introspect` is
+null when this client cannot introspect: a public client (no secret) cannot authenticate to the
+endpoint, and a provider may have none. Both are null in dev mode.

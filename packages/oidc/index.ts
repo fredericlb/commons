@@ -16,6 +16,7 @@ import type {
   Response,
 } from "express";
 import type { Client } from "openid-client";
+import { KEPT_FIELD, providerTokens } from "./providerTokens.ts";
 import {
   APP_ROOT,
   isSameOriginRequest,
@@ -89,24 +90,39 @@ export interface AuthOptions {
   groupsMaxAgeMs?: number;
   /** Per-subject "not before" epochs. Default: in memory, so a revocation lasts until a restart. */
   revocations?: SessionRevocations;
+  /** Keep the provider's access token for each session, in memory, for `accessToken(req)`. Default off (docs/session.md). */
+  keepAccessToken?: boolean;
+  /** With keepAccessToken, keep the refresh token too when the provider hands one, to renew an expired access token. */
+  keepRefreshToken?: boolean;
+}
+
+/** A session's stamps, and the key of its kept provider token when it has one (a handoff carries it). */
+export interface SessionStamps {
+  iat: number;
+  exp: number;
+  kept?: string;
 }
 
 /** What setupAuth hands back. */
 export interface AuthHandle {
   /** 401 unless the request carries a valid session; sets req.user. */
   requireAuth: RequestHandler;
-  /** Sign `user` in on this request's session, stamped now (or with `from`'s stamps). */
-  startSession(
-    req: Request,
-    user: SessionUser,
-    from?: { iat: number; exp: number },
-  ): void;
+  /** Sign `user` in on this request's session, stamped now (or with `from`'s stamps and kept token). */
+  startSession(req: Request, user: SessionUser, from?: SessionStamps): void;
   /** The request's valid session user, or null. */
   sessionUser(req: Request): SessionUser | null;
   /** The request's session stamps, when it carries a valid user. */
-  sessionStamps(req: Request): { iat: number; exp: number } | null;
+  sessionStamps(req: Request): SessionStamps | null;
   /** Kill every session of `sub` issued until now: a logout everywhere, or an account removed. */
   revokeSessions(sub: string): void;
+  /** The configured issuer, or null in dev mode. */
+  issuer: string | null;
+  /** The provider's access token kept for this request's session (keepAccessToken), or null. Never send it to a browser. */
+  accessToken(req: Request): Promise<string | null>;
+  /** The provider's UserInfo for a bearer token someone presents, or null when the provider refuses it. */
+  userinfoFor(accessToken: string): Promise<Record<string, unknown> | null>;
+  /** The provider's introspection of a token, or null when this client cannot introspect (no secret, no endpoint). */
+  introspect(token: string): Promise<Record<string, unknown> | null>;
 }
 
 /** Case-insensitive group membership; the caller passes its own admin list, which is per-app config. */
@@ -195,8 +211,13 @@ export async function setupAuth(
     next();
   });
 
-  const startSession: AuthHandle["startSession"] = (req, user, from) =>
-    stampSession(sessionOf(req), user, maxAgeMs, from);
+  const startSession: AuthHandle["startSession"] = (req, user, from) => {
+    const session = sessionOf(req);
+    stampSession(session, user, maxAgeMs, from);
+    // A handoff's session shares its browser session's kept token; any other start holds none yet.
+    if (from?.kept) session[KEPT_FIELD] = from.kept;
+    else delete session[KEPT_FIELD];
+  };
   const sessionUser = (req: Request): SessionUser | null =>
     validSessionUser(req.session as SessionBag | null | undefined, policy);
 
@@ -217,25 +238,33 @@ export async function setupAuth(
     discovery ??= openid()
       .then(({ Issuer }) => Issuer.discover(OIDC_ISSUER))
       .then(
-      (issuer) => {
-        console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
-        return new issuer.Client({
-          client_id: clientId,
-          client_secret: OIDC_CLIENT_SECRET,
-          // No secret is a PUBLIC client (a desktop app cannot keep one): PKCE alone proves the callback.
-          ...(OIDC_CLIENT_SECRET ? {} : { token_endpoint_auth_method: "none" }),
-          // No redirect_uris: it is per-request (redirectUriFor), passed explicitly by every call below.
-          response_types: ["code"],
-        });
-      },
-      (err: Error) => {
-        // Forgotten, so the next login asks again rather than replaying this failure.
-        discovery = null;
-        throw err;
-      },
-    );
+        (issuer) => {
+          console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
+          return new issuer.Client({
+            client_id: clientId,
+            client_secret: OIDC_CLIENT_SECRET,
+            // No secret is a PUBLIC client (a desktop app cannot keep one): PKCE alone proves the callback.
+            ...(OIDC_CLIENT_SECRET
+              ? {}
+              : { token_endpoint_auth_method: "none" }),
+            // No redirect_uris: it is per-request (redirectUriFor), passed explicitly by every call below.
+            response_types: ["code"],
+          });
+        },
+        (err: Error) => {
+          // Forgotten, so the next login asks again rather than replaying this failure.
+          discovery = null;
+          throw err;
+        },
+      );
     return discovery;
   };
+  const tokens = providerTokens({
+    getClient,
+    sessionUser,
+    keepRefresh: opts.keepRefreshToken === true,
+    hasSecret: !!OIDC_CLIENT_SECRET,
+  });
 
   if (devMode) {
     console.warn(
@@ -340,7 +369,10 @@ export async function setupAuth(
         } catch {
           /* UserInfo is optional — fall back to the ID-token claims */
         }
-        startSession(req, toUser(profile));
+        const user = toUser(profile);
+        startSession(req, user);
+        if (opts.keepAccessToken)
+          tokens.keep(session, String(user.sub ?? ""), tokenSet);
         delete session.oidc;
         res.redirect(
           safeReturnTarget(return_to ?? APP_ROOT, req, trustedOrigins),
@@ -362,6 +394,7 @@ export async function setupAuth(
       // ?everywhere=1 also kills the copies on every other device.
       if (req.query.everywhere === "1" && typeof user?.sub === "string")
         policy.revocations?.revoke(user.sub);
+      tokens.drop(req.session as SessionBag | null | undefined);
       req.session = null;
       res.json({ ok: true });
     });
@@ -390,9 +423,21 @@ export async function setupAuth(
     sessionStamps: (req) => {
       const s = req.session as SessionBag | null | undefined;
       if (!sessionUser(req) || !s) return null;
-      return { iat: s.iat as number, exp: s.exp as number };
+      const kept = s[KEPT_FIELD];
+      return {
+        iat: s.iat as number,
+        exp: s.exp as number,
+        ...(typeof kept === "string" ? { kept } : {}),
+      };
     },
     revokeSessions: (sub) => policy.revocations?.revoke(sub),
+    issuer: devMode ? null : (OIDC_ISSUER ?? null),
+    accessToken: (req) =>
+      devMode ? Promise.resolve(null) : tokens.accessToken(req),
+    userinfoFor: (token) =>
+      devMode ? Promise.resolve(null) : tokens.userinfoFor(token),
+    introspect: (token) =>
+      devMode ? Promise.resolve(null) : tokens.introspect(token),
   };
 }
 
