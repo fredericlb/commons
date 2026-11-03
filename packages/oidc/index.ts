@@ -191,7 +191,9 @@ export async function setupAuth(
   const maxAgeMs = opts.sessionMaxAgeMs ?? SESSION_MAX_AGE_MS;
   const policy: SessionPolicy = {
     revocations: opts.revocations ?? createSessionRevocations(),
-    groupsMaxAgeMs: opts.groupsMaxAgeMs,
+    ...(opts.groupsMaxAgeMs !== undefined
+      ? { groupsMaxAgeMs: opts.groupsMaxAgeMs }
+      : {}),
   };
 
   app.set("trust proxy", 1);
@@ -199,7 +201,7 @@ export async function setupAuth(
     sessionMiddleware({
       cookieName: opts.cookieName,
       secret: SESSION_SECRET,
-      domain: cookieDomain,
+      ...(cookieDomain !== undefined ? { domain: cookieDomain } : {}),
       maxAgeMs,
     }),
   );
@@ -242,7 +244,9 @@ export async function setupAuth(
           console.log(`🔐 OIDC enabled — issuer ${OIDC_ISSUER}`);
           return new issuer.Client({
             client_id: clientId,
-            client_secret: OIDC_CLIENT_SECRET,
+            ...(OIDC_CLIENT_SECRET !== undefined
+              ? { client_secret: OIDC_CLIENT_SECRET }
+              : {}),
             // No secret is a PUBLIC client (a desktop app cannot keep one): PKCE alone proves the callback.
             ...(OIDC_CLIENT_SECRET
               ? {}
@@ -356,9 +360,9 @@ export async function setupAuth(
         const { code_verifier, state, nonce, return_to } = (session.oidc ??
           {}) as Record<string, string | undefined>;
         const tokenSet = await client.callback(redirectUriFor(req), params, {
-          code_verifier,
-          state,
-          nonce,
+          ...(code_verifier !== undefined ? { code_verifier } : {}),
+          ...(state !== undefined ? { state } : {}),
+          ...(nonce !== undefined ? { nonce } : {}),
         });
         const claims = tokenSet.claims();
         // The ID token often lacks the display name, which UserInfo has: merged in, best-effort.

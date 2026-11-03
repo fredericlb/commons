@@ -35,9 +35,9 @@ export function bearerOrSession(
   verify: (token: string) => string | null,
 ): RequestHandler {
   return (req, res, next) => {
-    const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || "");
-    if (!m) return requireAuth(req, res, next);
-    const sub = verify(m[1].trim());
+    const token = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || "")?.[1];
+    if (token === undefined) return requireAuth(req, res, next);
+    const sub = verify(token.trim());
     if (!sub) return res.status(401).json({ error: "invalid token" });
     req.user = { sub, name: sub, email: null };
     next();

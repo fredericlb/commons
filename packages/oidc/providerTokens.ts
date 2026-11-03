@@ -20,7 +20,7 @@ interface Kept {
   accessToken: string;
   /** Epoch ms, or null when the provider gave no `expires_in`. */
   expiresAt: number | null;
-  refreshToken?: string;
+  refreshToken?: string | undefined;
   /** The session's own end: the record is dropped then whatever the token says. */
   until: number;
 }

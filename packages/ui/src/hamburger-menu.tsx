@@ -70,7 +70,7 @@ function HamburgerMenu({
             {item.separatorBefore ? <DropdownMenuSeparator /> : null}
             <DropdownMenuItem
               onClick={item.onClick}
-              disabled={item.disabled}
+              disabled={item.disabled ?? false}
               aria-current={item.active ? "page" : undefined}
               className={cn(
                 item.active && "font-medium",

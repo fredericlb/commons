@@ -150,27 +150,27 @@ interface RowProps<N extends TreeNode> {
   // Where a top-level row's drop lands. A leaf targets its PARENT folder, and a top-level leaf's parent is not
   // expressible as a prefix of its own path — it is the tree's root, which only the tree knows.
   rootPath: string;
-  activePath?: string | null;
+  activePath?: string | null | undefined;
   open: Record<string, boolean>;
   dropTarget: string | null;
   onToggle: (path: string) => void;
-  onOpen?: (node: N) => void;
-  opensOnName?: (node: N) => boolean;
+  onOpen?: ((node: N) => void) | undefined;
+  opensOnName?: ((node: N) => boolean) | undefined;
   onDropTarget: (path: string | null) => void;
-  onDropFiles?: (dir: string, files: File[]) => void;
-  onDropTree?: (dir: string, files: DroppedFile[]) => void;
-  onMove?: (from: string, toDir: string) => void;
-  canMove?: (node: N) => boolean;
+  onDropFiles?: ((dir: string, files: File[]) => void) | undefined;
+  onDropTree?: ((dir: string, files: DroppedFile[]) => void) | undefined;
+  onMove?: ((from: string, toDir: string) => void) | undefined;
+  canMove?: ((node: N) => boolean) | undefined;
   onContext: (node: N, e: React.MouseEvent) => void;
   // Set by `rowMenuLabel`: the ⋮ button's name, and whether this row has anything to offer.
-  menuLabel?: string;
+  menuLabel?: string | undefined;
   hasMenu: (node: N) => boolean;
   onMenuAt: (node: N, x: number, y: number) => void;
   acceptsFiles: (e: React.DragEvent) => boolean;
-  icon?: (node: N, open: boolean) => ReactNode;
-  isDisabled?: (node: N) => boolean;
-  rowEnd?: (node: N) => ReactNode;
-  nameEnd?: (node: N) => ReactNode;
+  icon?: ((node: N, open: boolean) => ReactNode) | undefined;
+  isDisabled?: ((node: N) => boolean) | undefined;
+  rowEnd?: ((node: N) => ReactNode) | undefined;
+  nameEnd?: ((node: N) => ReactNode) | undefined;
 }
 
 function Row<N extends TreeNode>(props: RowProps<N>) {
@@ -612,7 +612,7 @@ export function FileTree<N extends TreeNode>({
   // A lone top-level node is almost always a caller's own wrapping row — draw its children instead.
   const rootNodes: N[] =
     collapseSingleRoot && nodes.length === 1
-      ? ((nodes[0].children as N[] | undefined) ?? [])
+      ? ((nodes[0]?.children as N[] | undefined) ?? [])
       : nodes;
 
   return (

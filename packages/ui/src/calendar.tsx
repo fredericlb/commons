@@ -35,13 +35,15 @@ const monthTitle = (d: Date, locale: string) => {
 export const dayKey = (d: Date) =>
   `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const parseDayKey = (key: string) => {
-  const [y, m, d] = key.split("-").map(Number);
+  const [y = Number.NaN, m = Number.NaN, d = Number.NaN] = key
+    .split("-")
+    .map(Number);
   return new Date(y, m, d);
 };
 const monthKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const parseMonthKey = (m: string) => {
-  const [y, mo] = m.split("-").map(Number);
+  const [y = Number.NaN, mo = Number.NaN] = m.split("-").map(Number);
   return new Date(y, mo - 1, 1);
 };
 
