@@ -1,0 +1,9 @@
+/* Tailwind v4 entry for the design-system Storybook. Mirrors each app's
+   index.css: Tailwind + the shared @frediverse/ui design tokens. Tailwind v4
+   only auto-scans the config's own directory, so point the scanner at the
+   packages whose stories this Storybook renders. */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@frediverse/ui/theme.css";
+
+@source "../packages/ui/src";

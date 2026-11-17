@@ -1,0 +1,29 @@
+{
+  "name": "@frediverse/i18n",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./paraglide": "./src/paraglide.ts",
+    "./react": "./src/react.tsx",
+    "./vite": "./src/vite.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests"
+  },
+  "peerDependencies": {
+    "@inlang/paraglide-js": "^2.0.0",
+    "react": "^19.2.7"
+  },
+  "peerDependenciesMeta": {
+    "@inlang/paraglide-js": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}

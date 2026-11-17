@@ -1,0 +1,11 @@
+{
+  "name": "@frediverse/tsconfig",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Shared TypeScript bases. Extend one of these instead of copying compilerOptions between apps: react.json for Vite SPAs, node.json for backends and workspace libraries.",
+  "files": [
+    "base.json",
+    "react.json",
+    "node.json"
+  ]
+}

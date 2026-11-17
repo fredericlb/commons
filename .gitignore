@@ -1,0 +1,25 @@
+node_modules/
+.turbo/
+dist/
+storybook-static/
+
+# `turbo prune` output (the Docker deps stage generates this inside the image)
+out/
+
+# macOS junk (AppleDouble resource forks + Finder metadata)
+._*
+.DS_Store
+
+# TypeScript incremental-build state (tsc -b)
+*.tsbuildinfo
+**/tsconfig.tsbuildinfo
+
+# Claude Code's workspace: agent settings, granted permissions, scratch
+# worktrees. Local to each machine and regenerated on demand — never committed.
+.claude/
+
+# design-sync tooling artifacts (bundles + captured previews). Generated, large,
+# and not imported by any app code.
+.design-sync/
+.ds-sync/
+ds-bundle/

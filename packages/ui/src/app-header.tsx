@@ -1,0 +1,163 @@
+import * as React from "react";
+import { Button } from "./button";
+import { HamburgerMenu, type HamburgerMenuItem } from "./hamburger-menu";
+import { cn } from "./lib/utils";
+
+// The app bar every frediverse SPA shares: the app NAME on the left in the
+// brand face (Rubik 80s Fade, white), its top-level entries on the right — inline buttons from
+// `sm` up, collapsed into a hamburger menu below. The house look is `tint`:
+// the accent at 20 % over the page. `accent` (solid primary) and `plain` (card)
+// remain for an app that has a reason. See docs/app-header.md.
+
+export type AppHeaderItem = HamburgerMenuItem;
+
+export interface AppHeaderProps
+  extends Omit<React.HTMLAttributes<HTMLElement>, "title"> {
+  /** App name, left side. A link is fine — it renders as given. */
+  title: React.ReactNode;
+  /** Optional status line next to the title (e.g. a count). */
+  subtitle?: React.ReactNode;
+  /** Build stamp, shown only as a tooltip on hovering the name. */
+  version?: string;
+  /** Top-level entries — buttons on desktop, menu items behind the hamburger on mobile. */
+  items?: AppHeaderItem[];
+  /**
+   * Controls that stay inline on every screen size, after the entries — a
+   * lock button, a locale switcher, a "new" dialog trigger. Not for pages:
+   * those are `items`, and belong behind the hamburger on a phone.
+   */
+  actions?: React.ReactNode;
+  /** `tint` (the default) is the house look; the other two are opt-in. */
+  variant?: "tint" | "accent" | "plain";
+  /**
+   * Cap and centre the bar's content (`max-w-3xl mx-auto`), for an app whose
+   * page is a centred column and wants the bar to line up with it.
+   */
+  contained?: boolean;
+}
+
+const VARIANT = {
+  tint: {
+    // A tint, not a fill: the page shows through, and the bar reads as part
+    // of it rather than a lid on top.
+    bar: "border-b border-primary/20 bg-primary/20 text-foreground",
+    button: "",
+    // The active tab's sides and top, in the colour of the bar's bottom rule.
+    tab: "border-primary/20",
+    subtitle: "text-muted-foreground",
+  },
+  accent: {
+    bar: "bg-primary text-primary-foreground",
+    button:
+      "text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground",
+    tab: "border-transparent",
+    subtitle: "text-primary-foreground/75",
+  },
+  plain: {
+    bar: "border-b border-border bg-card text-foreground",
+    button: "",
+    tab: "border-border",
+    subtitle: "text-muted-foreground",
+  },
+} as const;
+
+const AppHeader = React.forwardRef<HTMLElement, AppHeaderProps>(
+  (
+    {
+      title,
+      subtitle,
+      version,
+      items = [],
+      actions,
+      variant = "tint",
+      contained = false,
+      className,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
+    const look = VARIANT[variant];
+    return (
+      <header
+        ref={ref}
+        className={cn("sticky top-0 z-10", look.bar, className)}
+        {...props}
+      >
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 px-5 py-3",
+            contained && "mx-auto max-w-3xl",
+          )}
+        >
+          <div className="flex min-w-0 items-baseline gap-3">
+            {/* The name in the brand face, white; the size is generous because
+                the face is built for display. */}
+            <span
+              className="truncate font-brand text-xl leading-none text-white"
+              title={version}
+            >
+              {title}
+            </span>
+            {subtitle ? (
+              <span
+                className={cn(
+                  "hidden truncate text-xs min-[420px]:inline",
+                  look.subtitle,
+                )}
+              >
+                {subtitle}
+              </span>
+            ) : null}
+          </div>
+
+          {children}
+
+          <div className="flex items-center gap-1 self-stretch">
+            {items.length > 0 ? (
+              <>
+                {/* Desktop: the entries are tabs through the bar's full height — docs/app-header.md. */}
+                <nav className="-mt-3 -mb-[calc(0.75rem+1px)] hidden items-stretch gap-1 self-stretch sm:flex">
+                  {items.map((item) => (
+                    <Button
+                      key={item.label}
+                      variant="ghost"
+                      size="sm"
+                      onClick={item.onClick}
+                      disabled={item.disabled}
+                      aria-current={item.active ? "page" : undefined}
+                      className={cn(
+                        "h-auto rounded-none border border-b-0 border-transparent px-3",
+                        look.button,
+                        item.active &&
+                          cn(
+                            "bg-background bg-clip-padding text-foreground hover:bg-background hover:text-foreground",
+                            look.tab,
+                          ),
+                        item.danger && "text-destructive",
+                      )}
+                    >
+                      {item.icon}
+                      {item.label}
+                      {item.trailing}
+                    </Button>
+                  ))}
+                </nav>
+
+                {/* Mobile: hamburger menu. */}
+                <HamburgerMenu
+                  items={items}
+                  className={cn(look.button, "sm:hidden")}
+                />
+              </>
+            ) : null}
+            {actions}
+          </div>
+        </div>
+      </header>
+    );
+  },
+);
+AppHeader.displayName = "AppHeader";
+
+export { AppHeader };

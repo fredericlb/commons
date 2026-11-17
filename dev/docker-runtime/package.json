@@ -1,0 +1,10 @@
+{
+  "name": "@frediverse/docker-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Shared container runtime assets baked into the root base image: the entrypoint that runs an app's backend alongside nginx, and the common nginx proxy snippet. Consumed by the repo-root Dockerfile via COPY, not by an import.",
+  "files": [
+    "entrypoint.sh",
+    "proxy-common.conf"
+  ]
+}

@@ -1,0 +1,10 @@
+# Caddy global options, shared by every frediverse repo.
+#
+# Only ONE Caddy process can bind :443, so scripts/caddy.mjs concatenates this
+# block with the site blocks of each repo it finds. Global options may appear
+# only once in a Caddyfile, which is why they live here and not in the repos'.
+{
+	servers {
+		protocols h1 h2
+	}
+}

@@ -1,0 +1,183 @@
+# The Electron shell
+
+What a desktop app on Electron shares: it runs an app's hosted Node servers on the user's machine,
+unchanged, behind one window. It holds nothing about any one app: what is an app's own stays in that app's tree.
+
+| subpath | what it holds |
+|---|---|
+| `servers` | a server started with Electron as its node — under tsx, or bundled — waited for, restarted when it crashes, stopped |
+| `guard` | the entry that leads each server's process group — built beside the main process |
+| `log` | one merged log, every line prefixed by who said it, buffered |
+| `boot` | the ports checked free — naming who holds one — and the session secret kept across launches |
+| `dialogs` | the failure dialog — Retry, Open log, Quit — and the `keepAlive` that asks it of a server given up on |
+| `window` | the window, and which links stay in it |
+| `windowState` | a window's bounds kept across launches, fitted onto a display that is there |
+| `external` | `openExternalSafely`, the one way a URL reaches the OS |
+| `permissions` | the session's permission handlers, request and check |
+| `policy` | the two decisions behind those, pure: which URL may leave, which frame gets a permission |
+| `lifecycle` | one copy of the app, a boot whose failure can be retried, a quit that can be declined and that waits |
+| `build`, `start`, `builder` | the esbuild bundle, the unpackaged run, the electron-builder base |
+
+## The servers run unchanged
+
+**Under tsx, as children — the way their Docker images run them** — or, when the app hands a
+bundle and no `tsx`, that bundle run by node as it is. Under tsx the packaged app carries source
+plus `node_modules` and a server behaves exactly as in production, at the cost of size and a
+compile on every start; a bundle is the app's choice when that cost matters.
+
+**Electron is their node**, through `ELECTRON_RUN_AS_NODE=1`. It is inherited, and that is
+load-bearing: a server that spawns with `process.execPath` gets Electron, and only that variable
+keeps it node. VS Code's terminals export the same variable, which is why `start` clears it for
+the app itself: with it set, Electron opens no window.
+
+**A server's cwd is never a checkout.** `@frediverse/env` reads the nearest `env.yaml` above the
+cwd and lets it outrank the environment, so a dev checkout's settings would otherwise win.
+`TSX_TSCONFIG_PATH` keeps each server on its own tsconfig.
+
+## Each server dies with the app
+
+**Each server is a process group led by a guard**, stopped as one: a server need not handle any
+signal, and what it spawned would outlive it. The guard's stdin is a pipe from the main process
+that nothing writes. The OS closes it however that process ends — Quit, a crash, Force Quit,
+SIGKILL — and the guard then stops its group.
+
+Stopping from the main process alone is not enough: a main process that dies never runs its
+shutdown, and its detached children keep the ports, which the next launch reports as already in
+use. A server that exits on its own takes its group with it for the same reason.
+
+**The server is asked first, alone; the group after it.** A server that spawned children of its
+own (k7's backend runs a file service per account) stops them in the order it needs, and a
+SIGTERM to the whole group would race it: a child killed before its parent asked it to stop is a
+write cut in half. So the guard asks the server only — its stdin closed, and SIGTERM where there
+is one — and gives it `SERVER_GRACE_MS` (`src/stopTimes.ts`), longer than any server here needs
+for its own stop. When the server exits, or the grace is up, whatever is left of the group gets
+SIGTERM, then SIGKILL after `SWEEP_GRACE_MS`. The main process waits for the guard longer than
+both before it kills the group itself.
+
+**On Windows the graceful stop is stdin.** There is no SIGTERM there: Node's `kill` and
+`taskkill /F` both end a process on the spot. The guard sets `ELECTRON_SHELL_STDIN_STOP=1` in
+the server's environment and gives it a stdin pipe; a server that reads the variable treats
+the end of its stdin as its stop signal, and should delete the variable so its own children do
+not inherit it. `taskkill /T /F` comes only once the grace is up.
+
+## When something fails
+
+**Every failure gets one dialog: Retry, Open log, Quit** (`src/dialogs.ts`). Open log opens the
+merged log in the system's viewer and leaves the dialog up, so the person reads, then chooses. A
+failure is never a box with only an OK button: the person who meets it has nothing to type and
+nobody to ask, and the dialog's three choices are everything they can do.
+
+**A failed boot is retried by relaunching the app**, not by calling `boot` again. A boot that
+went half way has opened windows, registered IPC handlers and started children; running it twice
+in one process doubles them. `app.relaunch()` and the ordinary quit leave nothing of the first
+try. An app whose window is already open passes `showFailure` to paint the error there too, and
+the dialog is attached to that window.
+
+**A port already taken names who holds it, when it can.** `assertPortsFree` asks `lsof` (macOS,
+Linux) or `netstat` and `tasklist` (Windows), each capped at 2 s, and puts the command and pid in
+its message (`src/portHolder.ts`). It never says "another copy of the app": the single-instance
+lock rules that out for this user. What the lock cannot see is the app run by ANOTHER user
+account on the same machine, holding the same loopback port, and that is the case the message
+names. `lsof` without root does not list another user's processes, so an unknown holder is
+reported as one this account cannot see rather than as no holder.
+
+**A hosted server that crashes after it answered is started again** — with `keepAlive`, on
+1 s doubling to 30 s, a run of 20 s resetting the delay, as the supervisor host does
+(`src/restart.ts`). A crash loop is not retried for ever: past 5 crashes in 5 minutes the server
+stays down, and `keepAliveDialog` asks Restart (the server alone, its count cleared) or Quit.
+Until then the pages see their requests fail, which is what they would see of a hosted server
+restarting; `onState` is there for an app that wants to say so. A server that exits before it
+ever answered is a failed boot, reported by `waitListening`, never restarted.
+
+## Quit
+
+**Quit hides every window at once.** The teardown takes up to `GUARD_WAIT_MS` plus the flush,
+and a window left on screen through it looks frozen. The windows are hidden, not closed: their
+pages are flushed next, so their throttling is turned off first.
+
+**`confirmQuit` is asked before anything goes down**, when the app passes it: false keeps the app
+running. It is asked only for a quit a person started — not for a signal, a relaunch, or a Quit
+chosen in a failure dialog — and a hook that throws counts as yes, since a quit the person
+cannot complete is worse than one they did not confirm.
+
+**Quit waits for the app's `stop`, and only so long.** `lifecycle` holds Electron's quit until
+it resolves, so the app decides the order its children go down in. A `stop` that throws or hangs
+past `stopTimeoutMs` still ends in `app.exit(0)`: an app that never exits is worse than a server
+stopped by its guard, which closing the app's pipes does anyway.
+
+**The pages write first.** Before `stop`, every page is asked to run `globalThis.__beforeQuit`,
+when it has one, and the quit waits for its promise up to 3 s. A page that holds typed text not
+yet on disk sets it, since the servers it writes through are about to go. The shell names no
+page: a page without the hook is simply not asked.
+
+## The log
+
+**One write stream, never a synchronous write.** Every child's stdout and stderr is relayed
+through `line`, on the main process — the thread that also runs the window's IPC — so a chatty
+server would otherwise stall it on the disk once per line. The stream buffers instead, and the
+quit closes it after `stop`, just before `app.exit`: a line written between the two is still
+on disk. A crash of the main process loses what is still buffered, a fraction of a second of
+lines. `echo: false` also keeps the lines off stdout, which a packaged
+app has nobody reading.
+
+## The window
+
+An app's own pages open as more windows of the app, with the same `webPreferences` — a preload
+among them, which a page opened by `window.open` would otherwise not get. Anything else opens in
+the system browser, and a navigation away from the app's pages is turned into the same: a
+desktop app is not a browser, and has no address bar to come back with. A window a page opens
+is guarded exactly like the first one, since it can navigate and open windows in turn.
+
+**A window reopens where it was left** (`windowState`): its normal bounds and whether it was
+maximized, in a JSON file the app names. The normal bounds, so a maximized window unmaximizes to
+where it was; fullscreen is not kept, since its bounds are the screen's. The saved rectangle is
+fitted onto the display it matches best now (`src/bounds.ts`): shrunk to that display's work
+area, then moved into it whole. A window saved on a monitor since unplugged opens on one that is
+there, never off screen.
+
+## What reaches the OS
+
+**Only `http:`, `https:` and `mailto:` are handed to `shell.openExternal`, never with a
+credential in the URL** (`externalUrl` in `src/policy.ts`). The OS answers every scheme it has a
+handler for: `file:` runs or reveals a local file, `smb:` leaks the user's NTLM hash to a remote
+share, `ms-msdt:` and `search-ms:` have been remote code execution on Windows, and any app can
+register one of its own. A page that calls `window.open` needs no click to reach that path, so
+an app calls `openExternalSafely` and never `shell.openExternal` itself. A refused URL is logged by
+its scheme alone and dropped.
+
+## Permissions
+
+**An app that hosts its pages installs `installPermissions` on its session.** Without a
+handler, Electron grants every permission to every frame — a foreign iframe's geolocation and
+notifications included. The handlers answer the request and the check alike, since most web APIs
+check first and some only check.
+
+A permission is granted when it is listed, the frame asking is on one of the app's origins, and
+so is the page at the top of its tree. Its scope then says which frame: `top` for the app's top
+frame alone, `app` for any of the app's frames inside one of its pages. The defaults are:
+
+| permission | scope | why |
+|---|---|---|
+| `media` | `top` | a mic or a camera, for the page the user is looking at |
+| `clipboard-sanitized-write` | `top` | a Copy button |
+| `fullscreen` | `app` | an element made fullscreen; an iframe still needs `allowfullscreen` |
+
+An app adds or widens what it needs (`grants`); everything else is refused, `geolocation`,
+`notifications`, `clipboard-read`, `display-capture`, the device APIs and `openExternal`
+among them. An external protocol a page navigates to (`openExternal`) is refused to Chromium and,
+when an app frame asked, handed to `openExternalSafely` instead, so a `mailto:` link still works.
+
+## Building and packaging
+
+**The main process is bundled to CommonJS**, since Electron's ESM main is awkward around
+`__dirname`, which `servers` needs to find the guard. The guard is built beside it, and
+**unpacked from the asar**: a child node reads it from disk, and only Electron's own process reads
+inside an asar.
+
+**The app's `staging/` is copied into Resources from `afterPack`**, because electron-builder's
+`extraResources` silently drops every directory named `node_modules`. `npmRebuild` is off:
+nothing native loads in Electron's own process, and the servers' dependencies are staged with
+their own install.
+
+**`ELECTRON_DIST=<unpacked dist>`** points electron-builder at an Electron already on disk, for
+the machines where its download keeps failing.

@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/.env
+**/.turbo
+**/tsconfig.tsbuildinfo
+storybook-static
+.git
+.gitignore
+.claude
+.design-sync
+.ds-sync
+ds-bundle
+*.log
